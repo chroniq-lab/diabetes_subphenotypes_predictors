@@ -13,7 +13,7 @@ aric_analysis <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/work
   mutate(across(contains("evr"),function(x) case_when(x=="N" ~ 0,
                                                       x == "Y" ~ 1,
                                                       TRUE ~ NA_real_))) %>% 
-  rename(dmagediag_orig = dmagediag) %>% 
+  rename(dmagediag_V3 = dmagediag) %>% 
   dplyr::mutate(ratio_th=tgl/hdlc,
                 glucosef2=glucosef*0.0555,
                 insulinf2=insulinf*6,
@@ -113,18 +113,19 @@ aric_analysis <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/work
       (visit==6)&(diab_126==1|diab_a1c65==1|(glucosef >= 126 & !is.na(glucosef))) ~ 1,
       visit!=6~NA_real_,
       TRUE~0)) %>% 
-  dplyr::filter(!is.na(age)) %>% 
+  # dplyr::filter(!is.na(age)) %>% 
   distinct(study_id,visit,bmi,glucosef,.keep_all =TRUE) %>% 
   arrange(study_id,visit) %>% 
   group_by(study_id) %>% 
   mutate(across(matches("(diab_v1|diab_new_v)"),function(x) zoo::na.locf(x,na.rm=FALSE))) %>% 
-  mutate(earliest_age = min(age),
-         dmagediag_orig = min(dmagediag_orig,na.rm=TRUE)) %>% 
+  dplyr::filter(!is.na(age)) %>% 
+  mutate(earliest_age = min(age,na.rm=TRUE),
+         dmagediag_V3 = min(dmagediag_V3,na.rm=TRUE)) %>% 
   # mutate(across(matches("(diab_new_v)"),function(x) zoo::na.locf(x,fromLast = TRUE,na.rm=FALSE))) %>% 
   ungroup() %>% 
-  mutate(dmagediag_orig = case_when(dmagediag_orig == Inf ~ NA_real_,
-                                    TRUE ~ dmagediag_orig)) %>% 
-  mutate(dmdiagvisit = case_when(dmagediag_orig < earliest_age ~ 1,
+  mutate(dmagediag_V3 = case_when(dmagediag_V3 == Inf ~ NA_real_,
+                                    TRUE ~ dmagediag_V3)) %>% 
+  mutate(dmdiagvisit = case_when(dmagediag_V3 < earliest_age ~ 1,
                                  diab_v1 == 1 ~ 1,
                                  diab_new_v2 == 1 ~ 2,
                                  diab_new_v3 == 1 ~ 3,
@@ -135,18 +136,20 @@ aric_analysis <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/work
 
 aric_events = aric_analysis %>% 
   dplyr::filter(visit == dmdiagvisit) %>% 
-  dplyr::select(study_id,dmagediag_orig,age,visit) %>% 
-  mutate(dmagediag = case_when(age < dmagediag_orig ~ age,
-                               !is.na(dmagediag_orig) ~ dmagediag_orig,
+  dplyr::select(study_id,dmagediag_V3,earliest_age,age,visit) %>% 
+  mutate(dmagediag = case_when(age < dmagediag_V3 ~ age,
+                               !is.na(dmagediag_V3) ~ dmagediag_V3,
                                TRUE ~ age)) 
+
+table(aric_events$visit > 1) # 3,716
+
 write_csv(aric_events,paste0(path_diabetes_subphenotypes_adults_folder,"/working/qc/dsppre01a_aric_events from diabetes_subphenotypes_predictors.csv"))
 
-table(aric_events$visit > 1) # 3,621
 
 aric_longitudinal = aric_analysis %>% 
   # Bringing the updated dmagediag from aric_events
   left_join(aric_events %>% 
-              dplyr::select(-age,-dmagediag_orig) %>% 
+              dplyr::select(-age,-earliest_age,-dmagediag_V3) %>% 
               dplyr::select(-visit),
             by=c("study_id")) %>% 
   mutate(
@@ -201,15 +204,28 @@ saveRDS(aric_selected,paste0(path_diabetes_subphenotypes_predictors_folder,"/wor
 aric_selected <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01a_aric.RDS"))
 
 # QC ----------
+# aric_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/processed/final_dataset_temp.RDS")) %>% 
+#   dplyr::filter(study == "aric") %>% 
+#   mutate(dmagediag = round(dmagediag,2))
 
 ## Who are missing in aric_events? ----
 aric_events_newdm = aric_events %>% 
   dplyr::filter(visit > 1)
 
-# From final_dataset_temp.RDS....
+# From final_dataset_temp.RDS (n = 3,802)....
 missing_aric_events = aric_newdm %>% 
   anti_join(aric_events_newdm,
+            by=c("original_study_id"="study_id")) # N = 119
+
+missing_aric_newdm = aric_events_newdm %>% 
+  anti_join(aric_newdm,
+            by=c("study_id"="original_study_id")) # N = 0
+
+missing_aric_events = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/processed/final_dataset_temp.RDS")) %>% 
+  dplyr::filter(study == "aric") %>% 
+  anti_join(aric_events_newdm,
             by=c("original_study_id"="study_id"))
+
 
 # Get rows for study_id that are missing in aric_events
 missing_aric_longitudinal = aric_longitudinal %>% 
@@ -217,6 +233,25 @@ missing_aric_longitudinal = aric_longitudinal %>%
                     dplyr::select(original_study_id,dmagediag) %>% 
                     rename(dmagediag_cluster = dmagediag),
                   by=c("study_id"="original_study_id")) %>% 
-  dplyr::select(study_id,dmagediag_cluster,visit,dmdiagvisit,dmagediag,dmagediag_orig,contains("age"),contains("diab"),"glucosef","hba1c")
+  dplyr::select(study_id,dmagediag_cluster,visit,age,earliest_age,dmdiagvisit,dmagediag,dmagediag_V3,diab_v1,contains("diab_new"),"glucosef","hba1c") %>% 
+  mutate(issue1 = case_when(dmagediag_V3 < earliest_age ~ 1,
+                            TRUE ~ 0),
+         issue2 = case_when(diab_v1 == 1 & dmagediag_V3 > earliest_age ~ 1,
+                            TRUE ~ 0),
+         issue3 = case_when(is.na(dmagediag) & !is.na(dmagediag_V3) ~ 1,
+                            TRUE ~ 0))
+
+
+missing_aric_earliest_age = missing_aric_longitudinal %>% 
+  # dplyr::filter(age >= dmagediag_) %>%
+  group_by(study_id) %>% 
+  dplyr::filter(age == min(age)) %>% 
+  ungroup() # N = 113
+
+table(missing_aric_earliest_age$dmagediag < missing_aric_earliest_age$age)
+missing_aric_earliest_age %>% group_by(issue1,issue2,issue3) %>% tally() %>% View()
 
 write_csv(missing_aric_longitudinal,paste0(path_diabetes_subphenotypes_adults_folder,"/working/qc/dsppre01a_missing_aric_longitudinal from diabetes_subphenotypes_predictors.csv"))
+
+# dat_newdm <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/aric_newdm.RDS"))
+
