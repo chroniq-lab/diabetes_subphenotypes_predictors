@@ -111,7 +111,7 @@ cardia_events = cardia_dat_all %>%
                                !is.na(dmagediag_locf) ~ dmagediag_locf,
                                TRUE ~ age)) 
 
-with(cardia_events,table(abs(age-dmagediag) <= 1))
+with(cardia_events,table((age-dmagediag) <= 1))
 
 
 write_csv(cardia_events,paste0(path_diabetes_subphenotypes_adults_folder,"/working/qc/dsppre01b_cardia_events from diabetes_subphenotypes_predictors.csv"))
@@ -148,13 +148,13 @@ cardia_longitudinal_newdm = cardia_longitudinal %>%
                rename(dmagediag_cluster = dmagediag),
              by = before_dmagediag) %>% 
   # !is.na(hba1c) -- not collected for most participants
-  dplyr::filter(!is.na(glucosef),!is.na(bmi)) %>% 
+  dplyr::filter(!is.na(hba1c)|!is.na(glucosef),!is.na(bmi)) %>% 
   mutate(diff_dmagediag = dmagediag - age)
 
 cardia_longitudinal_neverdm = cardia_longitudinal %>% 
   dplyr::filter(is.na(dmagediag)) %>% 
   # !is.na(hba1c) -- not collected for 25% participants
-  dplyr::filter(!is.na(glucosef),!is.na(bmi)) %>% 
+  dplyr::filter(!is.na(hba1c)|!is.na(glucosef),!is.na(bmi)) %>% 
   # Among study waves where fasting glucose, HbA1c and BMI are measured, get the penultimate (second-to-last) wave
   group_by(study_id) %>% 
   mutate(wave = 1:n()) %>% 

@@ -16,7 +16,11 @@ mesa_dat_all <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/worki
                                 TRUE ~ 0),
          
          diab_e1 = case_when(exam > 1 ~ NA_real_,
-                             dia_ada == 2 | dia_sr == 1 | (glucosef >= 126 & !is.na(glucosef)) ~ 1,
+                             dia_sr == 1  ~ 1,
+                             TRUE ~ 0),
+         
+         diab_new_e1 = case_when(exam > 1 ~ NA_real_,
+                             dia_ada == 2 | (glucosef >= 126 & !is.na(glucosef)) ~ 1,
                              TRUE ~ 0),
          
          diab_new_e2 = case_when(exam != 2 ~ NA_real_,
@@ -41,7 +45,7 @@ mesa_dat_all <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/worki
   mutate(earliest_age = min(age,na.rm=TRUE)) %>% 
   ungroup() %>% 
   mutate(dmdiagexam = case_when(
-                                 diab_e1 == 1 ~ 1,
+                                 diab_e1 == 1 | diab_new_e1 == 1 ~ 1,
                                  diab_new_e2 == 1 ~ 2,
                                  diab_new_e3 == 1 ~ 3,
                                  diab_new_e4 == 1 ~ 4,
@@ -72,7 +76,7 @@ mesa_events = mesa_dat_all %>%
   mutate(dmagediag = case_when(history_dm == 1 ~ -1,
                                TRUE ~ age)) 
 
-table(mesa_events$dmagediag > 0) # 3,716
+with(mesa_events,table((age-dmagediag) <= 1))
 
 write_csv(mesa_events,paste0(path_diabetes_subphenotypes_adults_folder,"/working/qc/dsppre01f_mesa_events from diabetes_subphenotypes_predictors.csv"))
 
@@ -105,13 +109,13 @@ mesa_longitudinal_newdm = mesa_longitudinal %>%
                rename(dmagediag_cluster = dmagediag),
              by = before_dmagediag) %>% 
   # !is.na(hba1c) -- not collected for most participants
-  dplyr::filter(!is.na(glucosef),!is.na(bmi)) %>% 
+  dplyr::filter(!is.na(hba1c)|!is.na(glucosef2),!is.na(bmi)) %>% 
   mutate(diff_dmagediag = dmagediag - age)
 
 mesa_longitudinal_neverdm = mesa_longitudinal %>% 
   dplyr::filter(is.na(dmagediag)) %>% 
   # !is.na(hba1c) -- not collected for most participants
-  dplyr::filter(!is.na(glucosef2),!is.na(bmi)) %>% 
+  dplyr::filter(!is.na(hba1c)|!is.na(glucosef2),!is.na(bmi)) %>% 
   # Among study waves where fasting glucose, HbA1c and BMI are measured, get the penultimate (second-to-last) wave
   group_by(study_id) %>% 
   mutate(wave = 1:n()) %>% 

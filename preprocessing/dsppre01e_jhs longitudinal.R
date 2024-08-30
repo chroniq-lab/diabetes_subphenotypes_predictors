@@ -13,7 +13,7 @@ jhs_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/p
 
 
 jhs_analysis <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/jhspre01_jhs_analysis.RDS")) %>% 
-  dplyr::filter(jhs == 0) %>%
+  dplyr::filter(aric == 0) %>%
   arrange(study_id,visit)  %>% 
   group_by(study_id) %>% 
   # Self-reported diabetes carried forward as 1 if 1
@@ -24,7 +24,11 @@ jhs_analysis <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/worki
   ungroup() %>% 
   mutate(diab_v1 = case_when(visit > 1 ~ NA_real_,
                              dmagediag_ever < age ~ 1,
-                             diabetes == 1 | (glucosef >=126 | hba1c >= 6.5) ~ 1,
+                             diabetes == 1 ~ 1,
+                             TRUE ~ 0),
+         diab_new_v1 = case_when(visit > 1 ~ NA_real_,
+                             dmagediag_ever == age ~ 1,
+                             (glucosef >=126 | hba1c >= 6.5) ~ 1,
                              TRUE ~ 0),
          diab_new_v2 = case_when(visit !=2 ~ NA_real_,
                                  dmagediag_ever <= age ~ 1,
@@ -41,7 +45,7 @@ jhs_analysis <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/worki
   mutate(earliest_age = min(age,na.rm=TRUE)) %>% 
   ungroup() %>% 
   mutate(dmdiagvisit = case_when(
-    diab_v1 == 1 ~ 1,
+    diab_v1 == 1 | diab_new_v1 == 1 ~ 1,
     diab_new_v2 == 1 ~ 2,
     diab_new_v3 == 1 ~ 3,
     TRUE ~ NA_real_)) %>% 
@@ -63,7 +67,7 @@ jhs_events = jhs_analysis %>%
                                !is.na(dmagediag_ever) ~ dmagediag_ever,
                                TRUE ~ age)) 
 
-table(jhs_events$visit > 1) # 3,716
+with(jhs_events,table((age-dmagediag) <= 1))
 
 write_csv(jhs_events,paste0(path_diabetes_subphenotypes_adults_folder,"/working/qc/dsppre01e_jhs_events from diabetes_subphenotypes_predictors.csv"))
 
@@ -97,13 +101,13 @@ jhs_longitudinal_newdm = jhs_longitudinal %>%
                rename(dmagediag_cluster = dmagediag),
              by = before_dmagediag) %>% 
   # !is.na(hba1c) -- not collected for most participants
-  dplyr::filter(!is.na(hba1c), !is.na(glucosef),!is.na(bmi)) %>% 
+  dplyr::filter(!is.na(hba1c)|!is.na(glucosef),!is.na(bmi)) %>% 
   mutate(diff_dmagediag = dmagediag - age)
 
 jhs_longitudinal_neverdm = jhs_longitudinal %>% 
   dplyr::filter(is.na(dmagediag)) %>% 
   # !is.na(hba1c) -- not collected for most participants
-  dplyr::filter(!is.na(glucosef),!is.na(bmi)) %>% 
+  dplyr::filter(!is.na(hba1c)|!is.na(glucosef),!is.na(bmi)) %>% 
   # Among study waves where fasting glucose, HbA1c and BMI are measured, get the penultimate (second-to-last) wave
   group_by(study_id) %>% 
   mutate(wave = 1:n()) %>% 
