@@ -6,14 +6,78 @@ anthro_vars <- c("sbp","dbp","height","wc","hc","triceps","iliac","abdominal","m
 lab_vars <- c("hba1c","insulinf","glucosef","glucose2h","vldlc","tgl","hdlc","ldlc",
               "serumcreatinine","ast","alt")
 
-dpp_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/processed/final_dataset_temp.RDS")) %>% 
-  dplyr::filter(study == "dpp") %>% 
-  mutate(original_study_id = as.numeric(original_study_id))  %>% 
-  mutate(dmagediag = round(dmagediag,2))
-
 # Each 'release' contributed a row
 dpp_demographics <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre01_demographic.RDS")) %>% 
   distinct(study_id,.keep_all=TRUE)
+
+# Each 'release' contributed a row
+dos_demographics <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dospre01_demographic.RDS")) %>% 
+  distinct(study_id,.keep_all=TRUE)
+
+# Diabetes outcomes ------------
+
+dpp_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/dpp_newdm.RDS")) 
+
+dos_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/dos_newdm.RDS")) %>% 
+  anti_join(dpp_newdm,
+            by=c("study_id")) 
+
+table(dos_newdm$study_id %in% dpp_newdm$study_id)
+table(dpp_newdm$study_id %in% dos_newdm$study_id)
+
+dos_nodm <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dospre03_events.RDS")) %>% 
+  anti_join(dpp_newdm,
+            by=c("study_id")) %>% 
+  anti_join(dos_newdm,
+            by=c("study_id")) %>% 
+  mutate(diagDays = round(diabt*365.25)) %>% 
+  distinct(study_id,diagDays,diabf) %>% 
+  group_by(study_id,diagDays) %>% 
+  summarize(diabf = max(diabf),
+            n = n()) %>% 
+  ungroup() %>% 
+  # There were some cases when diabf was both 0 and 1 --> checked a few against actual labs of glucosef and glucose2h 
+  dplyr::select(-n) %>% 
+  dplyr::filter(diabf == 0) %>% 
+  group_by(study_id) %>% 
+  dplyr::filter(diagDays == max(diagDays)) %>% 
+  ungroup()
+
+dpp_nodm <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre03_events.RDS")) %>% 
+  anti_join(dpp_newdm,
+            by=c("study_id")) %>% 
+  anti_join(dos_newdm,
+            by=c("study_id")) %>% 
+  anti_join(dos_nodm,
+            by=c("study_id")) %>% 
+  mutate(diagDays = round(diabt*365.25)) %>% 
+  distinct(study_id,diagDays,diabf) %>% 
+  group_by(study_id,diagDays) %>% 
+  summarize(diabf = max(diabf),
+            n = n()) %>% 
+  ungroup() %>% 
+  # There were some cases when diabf was both 0 and 1 --> checked a few against actual labs of glucosef and glucose2h 
+  dplyr::select(-n) %>% 
+  dplyr::filter(diabf == 0)   %>% 
+  group_by(study_id) %>% 
+  dplyr::filter(diagDays == max(diagDays)) %>% 
+  ungroup()
+
+
+
+
+dppos_max_diagDays = bind_rows(
+  dpp_newdm %>% mutate(dpp = 1, newdm = 1),
+  dos_newdm %>% mutate(dpp = 0, newdm = 1),
+  dpp_nodm %>% mutate(dpp = 1, newdm = 0),
+  dos_nodm %>% mutate(dpp = 0, newdm = 0),
+) %>% 
+  dplyr::select(study_id,dpp,newdm,diagDays)
+
+saveRDS(dppos_max_diagDays,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dpp_max_diagDays.RDS"))
+
+
+
 
 # There were some cases when the same 'lab_StudyDays' had multiple  values for the same parameter
 dpp_lab <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre02_labs.RDS")) %>% 
@@ -22,15 +86,17 @@ dpp_lab <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/in
   dplyr::select(-quarter,-semi,-quarter,-visit) %>% 
   group_by(study_id,lab_StudyDays) %>% 
   summarize(across(everything(),~mean(.,na.rm=TRUE))) %>% 
+  ungroup() 
+
+dos_lab <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dospre02_labs.RDS")) %>% 
+  rename(lab_StudyDays = StudyDays) %>% 
+  # -release -- not there in dpp; only in dppos
+  dplyr::select(-quarter,-semi,-quarter,-release,-visit) %>% 
+  group_by(study_id,lab_StudyDays) %>% 
+  summarize(across(everything(),~mean(.,na.rm=TRUE))) %>% 
   ungroup()
 
-dpp_events <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre03_events.RDS")) %>% 
-  mutate(diagDays = round(diabt*365.25)) %>% 
-  distinct(study_id,diagDays,diabf) %>% 
-  group_by(study_id,diagDays) %>% 
-  # There were some cases when diabf was both 0 and 1 --> checked a few against actual labs of glucosef and glucose2h 
-  dplyr::filter(diabf == max(diabf)) %>% 
-  ungroup()
+
 
 dpp_anthro <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre04_anthro.RDS")) %>% 
   rename(anthro_StudyDays = StudyDays) %>% 
@@ -39,21 +105,50 @@ dpp_anthro <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working
   summarize(across(everything(),~mean(.,na.rm=TRUE))) %>% 
   ungroup()
 
+
+dos_anthro <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dospre04_anthro.RDS")) %>% 
+  rename(anthro_StudyDays = StudyDays) %>% 
+  dplyr::select(-visit,-semi,-quarter,-visit) %>% 
+  group_by(study_id,anthro_StudyDays) %>% 
+  summarize(across(everything(),~mean(.,na.rm=TRUE))) %>% 
+  ungroup()
+
+
+lab = bind_rows(dpp_lab,
+                dos_lab) %>% 
+  left_join(dppos_max_diagDays,
+            by=c("study_id")) %>% 
+  # Keep all observations that have exact matches
+  dplyr::filter(lab_StudyDays <= diagDays) %>% 
+  # Keep all observations for 'nodm' and only pre-diagnosis matches for 'newdm'
+  dplyr::filter(newdm == 0 | (newdm == 1 & lab_StudyDays < diagDays))
+
+anthro = bind_rows(dpp_anthro,
+                dos_anthro) %>% 
+  left_join(dppos_max_diagDays,
+            by=c("study_id")) %>% 
+  # Keep all observations that have exact matches
+  dplyr::filter(anthro_StudyDays <= diagDays) %>% 
+  # Keep all observations for 'nodm' and only pre-diagnosis matches for 'newdm'
+  dplyr::filter(newdm == 0 | (newdm == 1 & anthro_StudyDays < diagDays))
+
+
 anthro_lab = join_by(study_id==study_id,
                      closest(lab_StudyDays >= anthro_StudyDays),
+                    # Decided an arbitrary cutoff of 90 days given the proximity in values and follow-up every 6 months
                      closest(lab_StudyDays <= anthro_StudyDays_plus90))
 
-dpp_longitudinal = dpp_demographics  %>% 
-  left_join(dpp_lab,
-            by=c("study_id")) %>% 
-  left_join(dpp_events, 
-            by=c("study_id","lab_StudyDays"="diagDays")) %>%
-  left_join(dpp_anthro %>% 
+
+dppos_longitudinal = lab %>%
+  left_join(anthro %>% 
+              dplyr::select(-dpp,-newdm,-diagDays) %>% 
               mutate(anthro_StudyDays_plus90 = anthro_StudyDays + 90),
             # Decided to use a rolling join defined as 'anthro_lab'
             # by=c("study_id","lab_StudyDays"="anthro_StudyDays"))   %>% 
             by=anthro_lab)   %>%
   dplyr::select(-anthro_StudyDays_plus90) %>% 
+  inner_join(dpp_demographics,
+             by=c("study_id")) %>% 
   mutate(age = case_when(agegroup == 1 ~ 37 + lab_StudyDays/365, # Less than 40
                          agegroup == 2 ~ 42 + lab_StudyDays/365,
                          agegroup == 3 ~ 47 + lab_StudyDays/365,
@@ -61,48 +156,13 @@ dpp_longitudinal = dpp_demographics  %>%
                          agegroup == 5 ~ 57 + lab_StudyDays/365,
                          agegroup == 6 ~ 62 + lab_StudyDays/365,
                          agegroup == 7 ~ 67 + lab_StudyDays/365)) %>% 
+  dplyr::filter(!is.na(bmi)) %>% 
   mutate(age = round(age,2),
          available_labs = rowSums(!is.na(.[,lab_vars])),
-         available_anthro = rowSums(!is.na(.[,anthro_vars])))
+         available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
+  dplyr::select(study_id,dpp,newdm,age,diagDays,lab_StudyDays,anthro_StudyDays,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars)) %>% 
+  arrange(study_id,lab_StudyDays,age)
 
 
-# Before dmagediag
-before_dmagediag = join_by(study_id == original_study_id,
-                           age < dmagediag)
-dpp_longitudinal_newdm = dpp_longitudinal %>% 
-  inner_join(dpp_newdm %>% 
-               dplyr::select(original_study_id,dmagediag),
-             by = before_dmagediag) %>% 
-  dplyr::filter(!is.na(hba1c)|!is.na(glucosef),!is.na(bmi)) %>% 
-  mutate(diff_dmagediag = dmagediag - age)
 
-dpp_longitudinal_neverdm = dpp_longitudinal %>% 
-  group_by(study_id) %>% 
-  mutate(ever_diabf = sum(diabf,na.rm=TRUE)) %>% 
-  ungroup() %>% 
-  dplyr::filter(ever_diabf == 0) %>% 
-  dplyr::filter(!is.na(hba1c)|!is.na(glucosef),!is.na(bmi)) %>% 
-  # Among study waves where fasting glucose, HbA1c and BMI are measured, get the penultimate (second-to-last) wave
-  group_by(study_id) %>% 
-  mutate(wave = 1:n()) %>% 
-  mutate(diff_next = case_when(wave == n() ~ NA_real_,
-                               TRUE ~ dplyr::lead(age,1) - age)) %>% 
-  ungroup() 
-
-
-dpp_selected = bind_rows(
-  dpp_longitudinal_newdm %>% 
-    # dplyr::filter(diff_dmagediag >= 9/12,diff_dmagediag <= 15/12) %>% 
-    mutate(type = "pre_1y_newdm") %>% 
-    rename(diff_age = diff_dmagediag),
-  dpp_longitudinal_neverdm %>% 
-    # dplyr::filter(!is.na(diff_next),diff_next >= 9/12,diff_next <= 15/12) %>% 
-    mutate(type = "pre_1y_neverdm") %>% 
-    rename(diff_age = diff_next)
-  
-) %>% 
-  dplyr::select(type,study_id,diff_age,age,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars)) %>% 
-  arrange(type,study_id,age)
-
-saveRDS(dpp_selected,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dpp.RDS"))
-dpp_selected <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dpp.RDS"))
+saveRDS(dppos_longitudinal,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dppos.RDS"))
