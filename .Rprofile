@@ -15,6 +15,9 @@ if(Sys.info()["user"] == "JVARGH7"){
   cluster_labels = c("MOD","SIRD","MARD","SIDD")
   cluster_colors = c("MOD"="#F8BDA4","SIRD"="#A1C3AC","SIDD"="#ACD9EA","MARD"="#D0ACC9")
   path_diabetes_subphenotypes_predictors_folder <- "C:/Cloud/OneDrive - Emory University/Papers/Predictors of Subphenotypes"
+  
+  path_prediabetes_subphenotypes_folder <- "C:/Cloud/OneDrive - Emory University/Papers/Subphenotypes of Prediabetes"
+  
 }
 
 if(Sys.info()["user"] == "zhongyuli"){

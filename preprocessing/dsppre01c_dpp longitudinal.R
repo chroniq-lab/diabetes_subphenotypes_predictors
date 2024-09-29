@@ -15,7 +15,8 @@ dos_demographics <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/w
   distinct(study_id,.keep_all=TRUE)
 
 # Diabetes outcomes ------------
-
+# Among intensive lifestyle, metformin, and placebo # participants, 849 had been diagnosed as having diabetes as of September, 2002, 
+# and another 503 participants developed diabetes during the first phase of DPPOS
 dpp_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/dpp_newdm.RDS")) 
 
 dos_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/dos_newdm.RDS")) %>% 
@@ -74,7 +75,7 @@ dppos_max_diagDays = bind_rows(
 ) %>% 
   dplyr::select(study_id,dpp,newdm,diagDays)
 
-saveRDS(dppos_max_diagDays,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dpp_max_diagDays.RDS"))
+# saveRDS(dppos_max_diagDays,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dpp_max_diagDays.RDS"))
 
 
 
@@ -118,19 +119,25 @@ lab = bind_rows(dpp_lab,
                 dos_lab) %>% 
   left_join(dppos_max_diagDays,
             by=c("study_id")) %>% 
-  # Keep all observations that have exact matches
-  dplyr::filter(lab_StudyDays <= diagDays) %>% 
+  # Removed the below to get later visits also
+  # dplyr::filter(lab_StudyDays <= diagDays) %>% 
+  
   # Keep all observations for 'nodm' and only pre-diagnosis matches for 'newdm'
-  dplyr::filter(newdm == 0 | (newdm == 1 & lab_StudyDays < diagDays))
+  # This is because for newdm == 1,  diagDays - lab_StudyDays are %in% c(0,365)
+  dplyr::filter(newdm == 0 | (newdm == 1 & lab_StudyDays < diagDays) | (newdm == 1 & lab_StudyDays > (diagDays + 365)))
 
 anthro = bind_rows(dpp_anthro,
                 dos_anthro) %>% 
   left_join(dppos_max_diagDays,
             by=c("study_id")) %>% 
-  # Keep all observations that have exact matches
-  dplyr::filter(anthro_StudyDays <= diagDays) %>% 
+  
+  # Removed the below to get later visits also
+  # dplyr::filter(anthro_StudyDays <= diagDays) %>%  
+  
   # Keep all observations for 'nodm' and only pre-diagnosis matches for 'newdm'
-  dplyr::filter(newdm == 0 | (newdm == 1 & anthro_StudyDays < diagDays))
+  # This is because for newdm == 1,  diagDays - anthro_StudyDays are %in% c(0,365)
+  
+  dplyr::filter(newdm == 0 | (newdm == 1 & anthro_StudyDays < diagDays) | (newdm == 1 & anthro_StudyDays > (diagDays + 365)))
 
 
 anthro_lab = join_by(study_id==study_id,
@@ -149,6 +156,13 @@ dppos_longitudinal = lab %>%
   dplyr::select(-anthro_StudyDays_plus90) %>% 
   inner_join(dpp_demographics,
              by=c("study_id")) %>% 
+  left_join(
+    bind_rows(dpp_newdm ,
+              dos_newdm) %>% 
+      dplyr::select(study_id,dmagediag),
+    by=c("study_id")
+    
+  ) %>% 
   mutate(age = case_when(agegroup == 1 ~ 37 + lab_StudyDays/365, # Less than 40
                          agegroup == 2 ~ 42 + lab_StudyDays/365,
                          agegroup == 3 ~ 47 + lab_StudyDays/365,
@@ -160,9 +174,12 @@ dppos_longitudinal = lab %>%
   mutate(age = round(age,2),
          available_labs = rowSums(!is.na(.[,lab_vars])),
          available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
-  dplyr::select(study_id,dpp,newdm,age,diagDays,lab_StudyDays,anthro_StudyDays,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars)) %>% 
+  dplyr::select(study_id,dpp,newdm,age,dmagediag,diagDays,lab_StudyDays,anthro_StudyDays,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars)) %>% 
   arrange(study_id,lab_StudyDays,age)
 
 
 
 saveRDS(dppos_longitudinal,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dppos.RDS"))
+
+dppos_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dppos.RDS"))
+write_csv(dppos_longitudinal,paste0(path_prediabetes_subphenotypes_folder,"/working/longitudinal/dpp and dppos.csv"))
