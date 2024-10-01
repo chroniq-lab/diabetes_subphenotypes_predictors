@@ -56,8 +56,9 @@ longitudinal_df = bind_rows(aric_longitudinal %>% mutate(study = "aric") %>% mut
   mutate(glucosef = case_when(is.na(glucosef) ~ glucosef2/0.0555,
                               TRUE ~ glucosef),
          insulinf = case_when(is.na(insulinf) ~ insulinf2/6,
-                              TRUE ~ insulinf)
-         
+                              TRUE ~ insulinf),
+         weight = case_when(!is.na(height) ~ bmi*(height/100)^2,
+                            TRUE ~ NA_real_)
          ) %>% 
 
   left_join(clusters %>% 
@@ -115,6 +116,8 @@ m1_ldlc = geeglm(ldlc ~ cluster*ns(t,2) + dmagediag + female + study,data = long
 m1_hdlc = geeglm(hdlc ~ cluster*ns(t,2) + dmagediag + female + study,data = longitudinal_df,id = cluster_study_id)
 m1_tgl = geeglm(tgl ~ cluster*ns(t,2) + dmagediag + female + study,data = longitudinal_df,id = cluster_study_id)
 m1_egfr_2021 = geeglm(egfr_2021 ~ cluster*ns(t,2) + dmagediag + female + study,data = longitudinal_df,id = cluster_study_id)
+m1_wc = geeglm(wc ~ cluster*ns(t,2) + dmagediag + female + study,data = longitudinal_df,id = cluster_study_id)
+m1_weight = geeglm(weight ~ cluster*ns(t,2) + dmagediag + female + study,data = longitudinal_df,id = cluster_study_id)
 
 
 
