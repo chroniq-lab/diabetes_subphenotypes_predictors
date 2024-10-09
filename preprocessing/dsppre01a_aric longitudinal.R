@@ -54,5 +54,8 @@ aric_longitudinal = aric_analysis %>%
 
 
 saveRDS(aric_longitudinal,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01a_aric.RDS"))
-# aric_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01a_aric.RDS"))
+
+# Writing to prediabetes phenotypes folder -------
+aric_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01a_aric.RDS"))
+write_csv(aric_longitudinal,paste0(path_prediabetes_subphenotypes_folder,"/working/longitudinal/aric.csv"))
 
