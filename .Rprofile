@@ -23,3 +23,10 @@ if(Sys.info()["user"] == "zhongyuli"){
   cluster_colors = c("MOD"="#F8BDA4","SIRD"="#A1C3AC","SIDD"="#ACD9EA","MARD"="#D0ACC9")
 }
 
+
+if(Sys.info()["user"] == "JGUO258"){
+  path_diabetes_subphenotypes_youth_folder <- "C:/Users/JGUO258/OneDrive - Emory/Subphenotypes in Youth-onset T2DM"
+  cluster_labels = c("MOD","SIRD","MARD","SIDD")
+  cluster_colors = c("MOD"="#F8BDA4","SIRD"="#A1C3AC","SIDD"="#ACD9EA","MARD"="#D0ACC9")
+  path_diabetes_subphenotypes_predictors_folder <- "C:/Users/JGUO258/OneDrive - Emory/Predictors of Subphenotypes"
+}
