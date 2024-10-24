@@ -1,5 +1,6 @@
 rm(list = ls());gc();source(".Rprofile")
 
+library(readxl)
 
 final_dataset_temp = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/final_dataset_temp.RDS"))
 
@@ -141,7 +142,7 @@ m1_homa = geeglm(glucosef ~ cluster*ns(t,2) + dmagediag + female + study,data = 
 m1_insulinf = geeglm(insulinf ~ cluster*ns(t,3) + dmagediag + female + study,data = analytic_df,id = cluster_study_id)
 # m1_glucosef = geeglm(glucosef ~ cluster*ns(t,2) + dmagediag + female + study,data = analytic_df,id = cluster_study_id)
 # m1_insulinf = geeglm(insulinf ~ cluster*ns(t,3) + dmagediag + female + study,data = analytic_df,id = cluster_study_id)
-m1_homa2b = geeglm(homa2b ~ cluster*ns(t,2) + dmagediag + female + study,data = analytic_df,id = cluster_study_id)
+m1_homa2b = geeglm(homa2b ~ cluster*ns(t,3) + dmagediag + female + study,data = analytic_df,id = cluster_study_id)
 m1_homa2ir = geeglm(homa2ir ~ cluster*ns(t,3) + dmagediag + female + study,data = analytic_df,id = cluster_study_id)
 
 
@@ -155,6 +156,11 @@ m1_weight = geeglm(weight ~ cluster*ns(t,2) + dmagediag + female + study,data = 
 
 
 
+t_predict_range = seq(-15,-1,by=0.5)
+t_display_range = c(-15,0)
+# t_predict_range = seq(-15,6,by=0.5) 
+# t_display_range = c(-15,6)
+t_display_breaks = seq(t_display_range[1],t_display_range[2],by=3)
 
 predictions_trajectory = function(model){
   
@@ -236,3 +242,14 @@ ggarrange(f1_bmi,
           ncol = 4) %>% 
   ggsave(.,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/trajectory of biomarkers before diagnosis.jpg"),width=12,height = 8)
 
+
+ggarrange(f1_bmi,
+          f1_hba1c,
+          f1_homa2b,
+          f1_homa2ir,
+          
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 2,
+          ncol = 2) %>% 
+  ggsave(.,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/trajectory of biomarkers before diagnosis for proposal.jpg"),width=6,height = 6)
