@@ -49,7 +49,7 @@ cardia_longitudinal = cardia_dat_all %>%
   mutate(
     available_labs = rowSums(!is.na(.[,lab_vars])),
     available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
-  dplyr::select(study_id,year,age,dmagediag,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars))
+  dplyr::select(study_id,year,age,female,race_rev,race,dmagediag,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars))
 
 
 saveRDS(cardia_longitudinal,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01b_cardia.RDS"))

@@ -1,7 +1,7 @@
 rm(list=ls());gc();source(".Rprofile")
 
 #--------------------------------------------------------------------------------------------------------------
-### ACCORD ###
+### DPP/DPPOS ###
 #--------------------------------------------------------------------------------------------------------------
 # includes new diagnosed dm + undiagnosed
 dppos_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dppos.RDS"))

@@ -20,10 +20,11 @@ mesa_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folde
 longitudinal_df = bind_rows(aric_longitudinal %>% mutate(study_id = as.numeric(str_replace(study_id,"C",""))),
                             cardia_longitudinal,
                             jhs_longitudinal,
-                            dppos_longitudinal,
+                            dppos_longitudinal %>% mutate(female = sex - 1),
                             mesa_longitudinal) %>%
   
-  bind_rows(final_dataset_temp %>% dplyr::select(-study_id) %>% rename(study_id = original_study_id) %>% 
+  bind_rows(final_dataset_temp %>% dplyr::select(-study_id) %>% 
+              rename(study_id = original_study_id) %>% 
               mutate(age = case_when(is.na(age) ~ dmagediag,
                                      TRUE ~ age)) %>% 
               dplyr::select(one_of(unique(c(
@@ -86,7 +87,7 @@ write_xlsx(list_of_dataframes, excel_path)
 # add homa2 in the dataset by study_id, study, age
 path_to_file <- paste0(path_diabetes_subphenotypes_predictors_folder, "/working/cleaned/homa2 calculation/homa2 indices values.xlsx")
 sheets <- c("aric", "cardia", "jhs", "dppos", "mesa")
-list_of_data <- lapply(sheets, function(sheet) read_excel(path_to_file, sheet = sheet))
+list_of_data <- lapply(sheets, function(sheet) readxl::read_excel(path_to_file, sheet = sheet))
 
 homa2_combined <- bind_rows(list_of_data, .id = "study")
 homa2_combined$study <- rep(sheets, sapply(list_of_data, nrow))
@@ -95,8 +96,11 @@ analytic_df <- longitudinal_df %>%
   left_join(homa2_combined %>% 
               rename(homa2b = `HOMA2 %B`,
                      homa2ir = `HOMA2 IR`) %>% 
-              dplyr::select(-c(`HOMA2 %S`,glucosef2,insulinf2)),
+              dplyr::select(-c(`HOMA2 %S`,glucosef2,insulinf2)) %>% 
+              distinct(study_id,study,age,.keep_all=TRUE),
             by = c("study_id","study","age"))
+
+saveRDS(analytic_df,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01_analytic df.RDS"))
 
 #---------------------------------------------------------------------------------------------------------------------------------------
 
@@ -185,11 +189,11 @@ ggplot(data=matched_df,aes(x=factor(dm),y=bmi)) +
 
 
 
-prediction model, vars typically in EHR (no fasting stuff, HOMA2; can use slef-reported data)
+# prediction model, vars typically in EHR (no fasting stuff, HOMA2; can use slef-reported data)
 # multinomial regression, newly diagnosed 3377
 # pooled logitic regression, ask shivani
 # discrete time event analysis
 
-2y risk of subphenotypes
-at this age, what is the probability of falling a subphenotype in how many/2 years from then on
-any age, 2y window, the prob of falling into one of the subpenotype
+# 2y risk of subphenotypes
+# at this age, what is the probability of falling a subphenotype in how many/2 years from then on
+# any age, 2y window, the prob of falling into one of the subpenotype
