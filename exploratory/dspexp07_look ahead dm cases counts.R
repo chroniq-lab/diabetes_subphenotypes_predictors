@@ -1,19 +1,19 @@
 rm(list=ls());gc();source(".Rprofile")
 
 #--------------------------------------------------------------------------------------------------------------
-### ACCORD ###
+### la ###
 #--------------------------------------------------------------------------------------------------------------
-# N = 10251
-accord_total = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/accord.RDS")) 
-# N = 601
-accord_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/accord_newdm.RDS")) 
+# N = 4901
+la_total = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/look_ahead.RDS")) 
+# N = 877
+la_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/la_newdm.RDS")) 
 
 
-# N = 3952
-accord_female <- accord_total %>%
+# N = 2871
+la_female <- la_total %>%
   dplyr::filter(female == 1)  
 
-# N = 3858
-accord_racemin <- accord_total %>%
+# N = 1654
+la_racemin <- la_total %>%
   dplyr::filter(!is.na(race_eth)) %>% 
   dplyr::filter(race_eth != "NH White") 
