@@ -242,14 +242,17 @@ ggarrange(f1_bmi,
           ncol = 4) %>% 
   ggsave(.,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/trajectory of biomarkers before diagnosis.jpg"),width=12,height = 8)
 
+formatting_proposal = theme(axis.title = element_text(size = 16),
+                              axis.text = element_text(size = 16),
+                              legend.text = element_text(size = 16))
 
-ggarrange(f1_bmi,
-          f1_hba1c,
-          f1_homa2b,
-          f1_homa2ir,
+ggarrange(# f1_bmi,
+          f1_hba1c + formatting_proposal,
+          f1_homa2b + formatting_proposal,
+          #f1_homa2ir,
           
           common.legend = TRUE,
           legend = "bottom",
           nrow = 2,
-          ncol = 2) %>% 
+          ncol = 1) %>% 
   ggsave(.,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/trajectory of biomarkers before diagnosis for proposal.jpg"),width=6,height = 6)
