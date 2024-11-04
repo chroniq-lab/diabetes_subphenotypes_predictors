@@ -9,11 +9,11 @@ accord_total = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/workin
 accord_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/accord_newdm.RDS")) 
 
 
-# N = 3952
-accord_female <- accord_total %>%
+# N = 235
+accord_female <- accord_newdm %>%
   dplyr::filter(female == 1)  
 
-# N = 3858
-accord_racemin <- accord_total %>%
+# N = 237
+accord_racemin <- accord_newdm %>%
   dplyr::filter(!is.na(race_eth)) %>% 
   dplyr::filter(race_eth != "NH White") 

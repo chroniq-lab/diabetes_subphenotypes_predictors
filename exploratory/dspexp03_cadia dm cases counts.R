@@ -37,7 +37,7 @@ cardia_ndm <- cardia_longitudinal %>%
 # distinct(study_id) %>%
 # nrow()
 
-### ARRIC Newly diagnosed dm: 769 ###
+### CARDIA Newly diagnosed dm: 769 ###
 
 #-------------------------------------------------------------------------
 # Total sample (no T2D + new T2D), N = 5054, obs = 31054
