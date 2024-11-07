@@ -71,6 +71,8 @@ nhanes_total <- bind_rows(nhanes_dm_newdiag,
                           nhanes_dm_undiag,
                           nhanes_ndm)
 
+saveRDS(nhanes_total, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dspexp09_nhanes new and no dm.RDS"))
+
 # N = 49390
 nhanes_female <- nhanes_total %>%
   dplyr::filter(gender == 2)  

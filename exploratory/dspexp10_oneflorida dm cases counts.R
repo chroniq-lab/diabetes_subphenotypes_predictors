@@ -73,6 +73,8 @@ supremeall <- bind_rows(supremedm_newdiag %>%
                         nonsupremedm %>% 
                           mutate(dm = 0)) 
 
+saveRDS(supremeall, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dspexp10_oneflorida new and no dm.RDS"))
+
 # distinct(ID) %>%
 # nrow()
 

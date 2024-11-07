@@ -45,6 +45,8 @@ cardia_total <- bind_rows(cardia_dm_newdiag,
                         cardia_dm_undiag,
                         cardia_ndm)
 
+saveRDS(cardia_total, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dspexp03_cardia new and no dm.RDS"))
+
 # N = 2738
 cardia_female <- cardia_total %>%
   dplyr::filter(female == 1)  

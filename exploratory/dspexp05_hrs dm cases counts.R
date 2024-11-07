@@ -76,11 +76,17 @@ hrs_total <- bind_rows(hrs_dm_newdiag,
                        hrs_dm_undiag,
                        hrs_ndm)
 
+saveRDS(hrs_total, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dspexp05_hrs new and no dm.RDS"))
+
 # N = 20263
 hrs_female <- hrs_total %>%
   dplyr::filter(gender == "Female")  
 
 attributes(hrs_total$race)$label <- NULL
+
+# 1: White
+# 2: Black/African American
+# 3: Other
 # N = 9024
 hrs_racemin <- hrs_total %>%
   dplyr::filter(!is.na(race)) %>% 

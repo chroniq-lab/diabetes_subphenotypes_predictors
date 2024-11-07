@@ -45,6 +45,8 @@ jhs_total <- bind_rows(jhs_dm_newdiag,
                         jhs_dm_undiag,
                         jhs_ndm)
 
+saveRDS(jhs_total, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dspexp06_jhs new and no dm.RDS"))
+
 # N = 1111
 jhs_female <- jhs_total %>%
   dplyr::filter(female == 1)  

@@ -43,6 +43,8 @@ dppos_total <- bind_rows(dppos_dm_newdiag,
                         dppos_dm_undiag,
                         dppos_ndm)
 
+saveRDS(dppos_total, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dspexp04_dpp new and no dm.RDS"))
+
 # N = 2389
 dppos_female <- dppos_total %>%
   dplyr::filter(sex == 2)  

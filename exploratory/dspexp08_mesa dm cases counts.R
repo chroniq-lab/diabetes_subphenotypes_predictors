@@ -45,6 +45,8 @@ mesa_total <- bind_rows(mesa_dm_newdiag,
                         mesa_dm_undiag,
                         mesa_ndm)
 
+saveRDS(mesa_total, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dspexp08_mesa new and no dm.RDS"))
+
 # N = 3253
 mesa_female <- mesa_total %>%
   dplyr::filter(female == 1)  

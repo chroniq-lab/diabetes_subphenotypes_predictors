@@ -45,6 +45,8 @@ aric_total <- bind_rows(aric_dm_newdiag,
                        aric_dm_undiag,
                        aric_ndm)
 
+saveRDS(aric_total, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dspexp02_aric new and no dm.RDS"))
+
 # N = 7500
 aric_female <- aric_total %>%
   dplyr::filter(female == 1)  
