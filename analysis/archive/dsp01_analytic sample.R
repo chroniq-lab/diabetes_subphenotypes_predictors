@@ -16,13 +16,6 @@ dppos_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_fold
 mesa_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01f_mesa.RDS")) %>% 
   mutate(study = "mesa")
 
-clusters = read_csv(paste0(path_diabetes_subphenotypes_adults_folder,"/working/processed/dec_an02_clean_kmeans_5var_mi_knn_cluster.csv")) %>% 
-  dplyr::select(-one_of("...1")) %>% 
-  left_join(final_dataset_temp %>% 
-              dplyr::select(study_id,original_study_id),
-            by=c("study_id")) %>% 
-  rename(cluster_study_id = study_id)
-
 
 longitudinal_df = bind_rows(aric_longitudinal %>% mutate(study_id = as.numeric(str_replace(study_id,"C",""))),
                             cardia_longitudinal,
@@ -105,11 +98,102 @@ analytic_df <- longitudinal_df %>%
                      homa2ir = `HOMA2 IR`) %>% 
               dplyr::select(-c(`HOMA2 %S`,glucosef2,insulinf2)) %>% 
               distinct(study_id,study,age,.keep_all=TRUE),
-            by = c("study_id","study","age")) %>% 
-  left_join(clusters %>% 
-              dplyr::select(cluster_study_id,original_study_id,cluster,study,female),
-            by=c("study"="study","study_id" = "original_study_id","female"))
+            by = c("study_id","study","age"))
 
 saveRDS(analytic_df,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01_analytic df.RDS"))
 
+#---------------------------------------------------------------------------------------------------------------------------------------
 
+
+
+# DM cases, 5y before diagnosis records, N = 1129
+dm_df <- analytic_df %>% 
+  dplyr::filter(!is.na(dmagediag)) %>% 
+  mutate(
+    time_diff = dmagediag - age,  
+    time_diff5 = abs(time_diff - 5) 
+  ) %>%
+  group_by(study_id) %>%
+  dplyr::filter(time_diff > 0 & time_diff5 <= 1) %>%  
+  slice_min(order_by = time_diff5, with_ties = FALSE) %>%  
+  ungroup() %>% 
+  dplyr::filter(!is.na(bmi) & !is.na(hba1c)) %>% 
+  dplyr::select(-c("time_diff","time_diff5"))
+
+
+# Non-DM cases
+ndm_df <- analytic_df %>% 
+  dplyr::filter(is.na(dmagediag)) %>% 
+  group_by(study_id) %>%
+  mutate(age_range = max(age) - min(age)) %>%  
+  dplyr::filter(age_range >= 4) %>% 
+  ungroup() %>%
+  dplyr::select(-age_range)
+
+# pair with previous year, N = 8244
+ndm_df_joined <- ndm_df %>% 
+  rename(current_age = age) %>% 
+  mutate(current_age_minus5 = current_age - 5) %>% 
+  left_join(ndm_df %>% 
+              dplyr::select(study_id,age) %>% 
+              rename(previous_age = age), by = "study_id") %>%
+  dplyr::filter(previous_age < current_age) %>%
+  mutate(age_diff = abs(previous_age - current_age_minus5)) %>%
+  dplyr::filter(age_diff <= 1) %>% 
+  group_by(study_id, current_age) %>%
+  slice(1) %>% 
+  ungroup() %>% 
+  dplyr::filter(!is.na(bmi) & !is.na(hba1c)) %>% 
+  dplyr::select(-c("current_age", "current_age_minus5", "age_diff"))
+
+#-------------------------------------------------------------------------------------------------------------------------------
+clusters = read_csv(paste0(path_diabetes_subphenotypes_adults_folder,"/working/processed/dec_an02_clean_kmeans_5var_mi_knn_cluster.csv")) %>% 
+  dplyr::select(-one_of("...1")) %>% 
+  left_join(final_dataset_temp %>% 
+              dplyr::select(study_id,original_study_id),
+            by=c("study_id")) %>% 
+  rename(cluster_study_id = study_id)
+
+# match DM and non-DM cases based on age, bmi, hba1c, study
+full_df <- bind_rows(dm_df %>% 
+                         mutate(dm = 1), 
+                       ndm_df_joined %>% 
+                         mutate(dm = 0) %>% 
+                       rename(age = previous_age)) %>% 
+  left_join(clusters %>% 
+              dplyr::select(cluster_study_id,original_study_id,cluster,study,female),
+            by=c("study"="study","study_id" = "original_study_id")) %>% 
+  
+  dplyr::filter(!is.na(cluster_study_id)) %>% 
+  mutate(t = age - dmagediag) %>% 
+  dplyr::filter(t >= -15, t < 0)
+
+# add cluster varfiable
+
+
+library(MatchIt)
+
+match_model <- matchit(dm ~ age + bmi + hba1c + study, data = full_df,
+                       method = "nearest", ratio = 1)  # 'ratio = 1' for 1:1 matching
+
+matched_df<- match.data(match_model)
+
+saveRDS(matched_df, paste0(path_diabetes_subphenotypes_predictors_folder, "/working/cleaned/dsp01_matched df.RDS"))
+
+glm(dm ~ homa2ir,data=matched_df,family=binomial()) %>% summary()
+glm(dm ~ hba1c,data=matched_df,family=binomial()) %>% summary()
+glm(dm ~ cluster,data=matched_df,family=binomial()) %>% summary()
+
+ggplot(data=matched_df,aes(x=factor(dm),y=bmi)) +
+  geom_boxplot()
+
+
+
+# prediction model, vars typically in EHR (no fasting stuff, HOMA2; can use slef-reported data)
+# multinomial regression, newly diagnosed 3377
+# pooled logitic regression, ask shivani
+# discrete time event analysis
+
+# 2y risk of subphenotypes
+# at this age, what is the probability of falling a subphenotype in how many/2 years from then on
+# any age, 2y window, the prob of falling into one of the subpenotype
