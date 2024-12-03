@@ -7,8 +7,8 @@ colnames(analytic_df)
 
 continuous_vars <- c("age", "sbp", "dbp", "height", "wc", "bmi", "hba1c", "insulinf",
                      "glucosef", "glucose2h", "tgl", "hdlc", "ldlc", "serumcreatinine", "urinecreatinine",
-                     "egfr", "apo_a", "apo_b", "uric_acid", "vldlc", "diagDays", "lab_StudyDays", 
-                     "anthro_StudyDays", "hc", "triceps", "iliac", "abdominal", "medial", "ast", "alt",
+                     "egfr", "apo_a", "apo_b", "uric_acid", "vldlc", 
+                     "hc", "triceps", "iliac", "abdominal", "medial", "ast", "alt",
                      "insulinf2", "glucosef2", "urinealbumin", "uacr", "weight", "homa2b", "homa2ir")
 
 proportion_vars <- c("female")
@@ -16,7 +16,7 @@ proportion_vars <- c("female")
 grouped_vars <- c("race_eth")
 
 # Moved dmagediag to an ID variable
-id_vars <- c("study_id", "study", "visit", "year", "exam", "cluster_study_id", "newdm", "dmagediag")
+id_vars <- c("study_id", "study", "visit", "year", "exam", "cluster_study_id", "newdm", "dmagediag","diagDays", "anthro_StudyDays", "lab_StudyDays")
 
 library(survey)
 library(mice)
@@ -49,4 +49,4 @@ mi_dfs <- mice(before_imputation,
 
 df <- complete(mi_dfs, action = 1)
 
-saveRDS(df, "analysis/mi_dfs.RDS")
+saveRDS(df, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs.RDS"))
