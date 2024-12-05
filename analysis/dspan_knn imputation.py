@@ -41,5 +41,5 @@ data_mi.describe()
 imputed_data.describe()
 
 
-imputed_data.to_csv(path_diabetes_subphenotypes_predictors_folder + '/working/cleaned/dsppre02_knn imputation.csv', index=False)
+imputed_data.to_csv(path_diabetes_subphenotypes_predictors_folder + '/working/processed/dsppre02_knn imputation.csv', index=False)
 

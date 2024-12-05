@@ -6,8 +6,12 @@ library(ggsurvfit)
 library(broom)
 library(tidyr)
 
+source("functions/egfr_ckdepi_2021.R")
+
 # follow-up time >15y & dm == 0 --- event == 0
-mice_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs.RDS")) %>% 
+# mice_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs.RDS")) %>% 
+imputed_df <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dsppre02_knn imputation.csv")) %>%
+  mutate(egfr_ckdepi_2021 = egfr_ckdepi_2021(scr = serumcreatinine, female = female, age = age)) %>% 
   group_by(study, study_id) %>% 
   mutate(min_age = min(age)) %>%
   # Restrict to observations within 15 years of earliest age
@@ -34,7 +38,7 @@ mice_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/workin
                                   
                                   )) %>%
   ungroup() %>% 
-  
+  # 5 categories in study: aric, cardia, dppos, jhs, mesa
   mutate(study_aric = case_when(study == "aric" ~ 1,
                                 TRUE ~ 0),
          study_cardia = case_when(study == "cardia" ~ 1,
@@ -43,25 +47,23 @@ mice_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/workin
                                 TRUE ~ 0),
          study_jhs = case_when(study == "jhs" ~ 1,
                                 TRUE ~ 0),
-         study_mesa = case_when(study == "mesa" ~ 1,
+    # 5 categories in race: NH White, NH Black, NH Other, Hispanic, Other  
+         race_nhwhi = case_when(race == "NH White" ~ 1,
                                 TRUE ~ 0),
-         race_nhwhi = case_when(race_eth == "NH White" ~ 1,
+         race_nhbla = case_when(race == "NH Black" ~ 1,
                                 TRUE ~ 0),
-         race_nhbla = case_when(race_eth == "NH Black" ~ 1,
+         race_nhoth = case_when(race == "NH Other" ~ 1,
                                 TRUE ~ 0),
-         race_nhoth = case_when(race_eth == "NH Other" ~ 1,
-                                TRUE ~ 0),
-         race_hisp = case_when(race_eth == "Hispanic" ~ 1,
+         race_hisp = case_when(race == "Hispanic" ~ 1,
                                 TRUE ~ 0)) %>%
   # define time to event
   mutate(time_to_event = censored_age - age) %>% 
-  dplyr::filter(time_to_event > 0)
-
+  dplyr::filter(time_to_event > 0) 
 
 #------------------------------------------------------------------------------------------------------------------------
 # cross-sectional datatset, cox PH model
 # overall, include all variables, 1 obs for each person
-cross_df <- mice_df %>% 
+cross_df <- imputed_df %>% 
   group_by(study_id,study) %>% 
   dplyr::filter(age == min(age)) %>% 
   ungroup()
@@ -84,25 +86,10 @@ summary(cox_mod)
 # p>.05 covariates: insulinf, abdominal
 
 #------------------------------------------------------------------------------------------------------------------------
-final_dataset_temp = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/final_dataset_temp.RDS"))
-clusters = read_csv(paste0(path_diabetes_subphenotypes_adults_folder,"/working/processed/dec_an02_clean_kmeans_5var_mi_knn_cluster.csv")) %>% 
-  dplyr::select(-one_of("...1")) %>% 
-  left_join(final_dataset_temp %>% 
-              dplyr::select(study_id,original_study_id),
-            by=c("study_id")) %>% 
-  rename(cluster_study_id = study_id)
-
-# assign cluster
-cluster_df <- mice_df %>% 
-  left_join(clusters %>% 
-              dplyr::select(cluster_study_id,original_study_id,cluster,study),
-            by=c("study"="study","study_id" = "original_study_id", "cluster_study_id")) %>% 
-  ### exclude diabetes patients with no cluster data
-  dplyr::filter(!(event == 1 & is.na(cluster)))
-
-
 # cause-specific HR
-analytic_sample <- cluster_df %>% 
+analytic_sample <- imputed_df %>% 
+  ### exclude diabetes patients with no cluster data
+  dplyr::filter(!(event == 1 & is.na(cluster))) %>% 
   mutate(mard = case_when(cluster == "MARD" ~ 1,
                           TRUE ~ 0),
          mod = case_when(cluster == "MOD" ~ 1,
@@ -112,7 +99,7 @@ analytic_sample <- cluster_df %>%
          sird = case_when(cluster == "SIRD" ~ 1,
                           TRUE ~ 0))
 
-saveRDS(analytic_sample, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/analytic_df.RDS"))
+saveRDS(analytic_sample, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan02_cluster df.RDS"))
 
 diseases <- c("mard", "mod", "sidd", "sird")
 
@@ -126,11 +113,11 @@ analytic_sample %>%
 # chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://cran.r-project.org/web/packages/ncvreg/ncvreg.pdf
 
 # exclude missing values
-variables_to_check <- c("study_aric", "study_cardia", "study_dppos", "study_jhs", "study_mesa",
+variables_to_check <- c("study_aric", "study_cardia", "study_dppos", "study_jhs", 
                         "race_nhwhi", "race_nhbla", "race_nhoth", "race_hisp",
                         "age", "female", "bmi", "hba1c", "sbp", "dbp", "hdlc", "ldlc",
                         "homa2b", "homa2ir", "height", "wc", "glucosef", "glucose2h", "tgl",
-                        "serumcreatinine", "urinecreatinine", "egfr", "apo_a", "apo_b", "uric_acid",
+                        "serumcreatinine", "urinecreatinine", "egfr_ckdepi_2021", "apo_a", "apo_b", "uric_acid",
                         "vldlc", "hc", "triceps", "iliac", "medial", "ast", "alt", "urinealbumin",
                         "weight", "insulinf", "abdominal")
 
@@ -143,11 +130,11 @@ df_clean <- analytic_sample %>%
 y <- Surv(df_clean$time_to_event, df_clean$event)  
 
 # Select predictors
-X <- as.matrix(df_clean[, c("study_aric", "study_cardia", "study_dppos", "study_jhs", "study_mesa",
+X <- as.matrix(df_clean[, c("study_aric", "study_cardia", "study_dppos", "study_jhs", 
                       "race_nhwhi", "race_nhbla", "race_nhoth", "race_hisp",
                       "age", "female", "bmi", "hba1c", "sbp", "dbp", "hdlc", "ldlc",
                       "homa2b", "homa2ir", "height", "wc", "glucosef", "glucose2h", "tgl",
-                      "serumcreatinine", "urinecreatinine", "egfr", "apo_a", "apo_b", "uric_acid",
+                      "serumcreatinine", "urinecreatinine", "egfr_ckdepi_2021", "apo_a", "apo_b", "uric_acid",
                       "vldlc", "hc", "triceps", "iliac", "medial", "ast", "alt", "urinealbumin",
                       "weight", "insulinf", "abdominal")])
 
@@ -199,8 +186,8 @@ best_lambda <- cv_scad$lambda.min
 final_scad_model <- ncvsurv(X, y, penalty = "SCAD", lambda = best_lambda)
 print(coef(final_scad_model))
 
-# non-zero: study, homa2ir, hba1c, race_eth, female, serumcreatinine, uric_acid, bmi, insulinf, age, hc, glucosef
-# glucose2h, homa2b, wc, height, hdlc, vldlc, dbp, triceps, alt, sbp, egfr, urinealbumin, urinecreatinine
+# non-zero: study, homa2ir, race, hba1c, uric_acid, wc, glucosef, age, glucose2h, weight, homa2b, insulinf, alt, female
+# abdominal, egfr_ckdepi_2021, tgl, sbp, hdlc, apo_a
 #---------------------------------------------------------------------------------------------------------------------------------
 # cox PH model
 cross_df <- analytic_sample %>% 
@@ -210,24 +197,32 @@ cross_df <- analytic_sample %>%
 
 table(cross_df$event)
 
-mard_cp <- coxph(Surv(time_to_event, mard) ~ study_aric + study_cardia + study_dppos + study_jhs + study_mesa 
-                 + race_nhwhi + race_nhbla + race_nhoth + race_hisp 
-                 + homa2ir + hba1c + female + serumcreatinine + uric_acid + bmi + insulinf + age + hc + glucosef, 
+# check collinearity
+# >0.7: homa2ir ~ homa2b, homa2ir ~ insulinf, wc ~ weight, insulinf ~ homa2b
+# keep: insulinf, wc
+cor(cross_df[, c("homa2ir", "hba1c", "uric_acid", "wc", "glucosef", "age", "glucose2h", "weight", 
+                 "homa2b", "insulinf", "alt", "female")]) 
+
+mard_cp <- coxph(Surv(time_to_event, mard) ~ study_aric + study_cardia + study_dppos + study_jhs + race
+                 + hba1c + uric_acid + wc + glucosef + age + glucose2h + insulinf + alt + female, 
                  data = cross_df)
 
-mod_cp <- coxph(Surv(time_to_event, mod) ~ study_aric + study_cardia + study_dppos + study_jhs + study_mesa 
-                + race_nhwhi + race_nhbla + race_nhoth + race_hisp 
-                + homa2ir + hba1c + female + serumcreatinine + uric_acid + bmi + insulinf + age + hc + glucosef, 
+mod_cp <- coxph(Surv(time_to_event, mod) ~ study_aric + study_cardia + study_dppos + study_jhs + race
+                + hba1c + uric_acid + wc + glucosef + age + glucose2h + insulinf + alt + female, 
                 data = cross_df)
 
-sidd_cp <- coxph(Surv(time_to_event, sidd) ~ study_aric + study_cardia + study_dppos + study_jhs + study_mesa 
-                 + race_nhwhi + race_nhbla + race_nhoth + race_hisp 
-                 + homa2ir + hba1c + female + serumcreatinine + uric_acid + bmi + insulinf + age + hc + glucosef, 
-                 data = cross_df)
+# get convergence warning from adding race as a covariate
+# sidd == 1: Hisp, 9; NH Bla, 51; NH Oth, 0; NH Whi, 30; Other, 2
+# merge "NH Other" category to "Other"
+sidd_df <- cross_df %>%
+  mutate(race = ifelse(race == "NH Other", "Other", race))
 
-sird_cp <- coxph(Surv(time_to_event, sird) ~ study_aric + study_cardia + study_dppos + study_jhs + study_mesa 
-                 + race_nhwhi + race_nhbla + race_nhoth + race_hisp 
-                 + homa2ir + hba1c + female + serumcreatinine + uric_acid + bmi + insulinf + age + hc + glucosef, 
+sidd_cp <- coxph(Surv(time_to_event, sidd) ~ study_aric + study_cardia + study_dppos + study_jhs + strata(race)
+                 + hba1c + uric_acid + wc + glucosef + age + glucose2h + insulinf + alt + female, 
+                 data = sidd_df)
+
+sird_cp <- coxph(Surv(time_to_event, sird) ~ study_aric + study_cardia + study_dppos + study_jhs + race
+                 + hba1c + uric_acid + wc + glucosef + age + glucose2h + insulinf + alt + female, 
                  data = cross_df)
 
 
@@ -259,7 +254,7 @@ output <- na.omit(df1) %>%
   left_join(na.omit(df2), by = "term") %>% 
   left_join(na.omit(df3), by = "term") %>% 
   left_join(na.omit(df4), by = "term")  %>% 
-  write_csv("analysis/dsp02_imputed cox ph results.csv")
+  write_csv("analysis/dspan02_imputed cox ph results.csv")
 #------------------------------------------------------------------------------------------------------------------------
 # TDCM analysis
 # Start time: previous age; End time: current age at visit
@@ -270,48 +265,22 @@ tdcm_df <- analytic_sample %>%
   mutate(
     # Creating baseline variables by using the `lag()` function to get the previous age's value
     # Baseline values
-    baseline_homa2ir = case_when(
-      row_number() == 1 ~ homa2ir,
-      TRUE ~ dplyr::lag(homa2ir, 1, default = NA)
-    ),
-    baseline_hba1c = case_when(
-      row_number() == 1 ~ hba1c,
-      TRUE ~ dplyr::lag(hba1c, 1, default = NA)
-    ),
-    baseline_serumcreatinine = case_when(
-      row_number() == 1 ~ serumcreatinine,
-      TRUE ~ dplyr::lag(serumcreatinine, 1, default = NA)
-    ),
-    baseline_uric_acid = case_when(
-      row_number() == 1 ~ uric_acid,
-      TRUE ~ dplyr::lag(uric_acid, 1, default = NA)
-    ),
-    baseline_bmi = case_when(
-      row_number() == 1 ~ bmi,
-      TRUE ~ dplyr::lag(bmi, 1, default = NA)
-    ),
-    baseline_insulinf = case_when(
-      row_number() == 1 ~ insulinf,
-      TRUE ~ dplyr::lag(insulinf, 1, default = NA)
-    ),
-    baseline_hc = case_when(
-      row_number() == 1 ~ hc,
-      TRUE ~ dplyr::lag(hc, 1, default = NA)
-    ),
-    baseline_glucosef = case_when(
-      row_number() == 1 ~ glucosef,
-      TRUE ~ dplyr::lag(glucosef, 1, default = NA)
-    ),
+    baseline_hba1c = if_else(row_number() == 1, hba1c, dplyr::lag(hba1c, 1, default = NA)),
+    baseline_uric_acid = if_else(row_number() == 1, uric_acid, dplyr::lag(uric_acid, 1, default = NA)),
+    baseline_wc = if_else(row_number() == 1, wc, dplyr::lag(wc, 1, default = NA)),
+    baseline_glucosef = if_else(row_number() == 1, glucosef, dplyr::lag(glucosef, 1, default = NA)),
+    baseline_glucose2h = if_else(row_number() == 1, glucose2h, dplyr::lag(glucose2h, 1, default = NA)),
+    baseline_insulinf = if_else(row_number() == 1, insulinf, dplyr::lag(insulinf, 1, default = NA)),
+    baseline_alt = if_else(row_number() == 1, alt, dplyr::lag(alt, 1, default = NA)),
     
     # Change calculations
-    change_homa2ir = homa2ir - baseline_homa2ir,
     change_hba1c = hba1c - baseline_hba1c,
-    change_serumcreatinine = serumcreatinine - baseline_serumcreatinine,
     change_uric_acid = uric_acid - baseline_uric_acid,
-    change_bmi = bmi - baseline_bmi,
+    change_wc = wc - baseline_wc,
+    change_glucosef = glucosef - baseline_glucosef,
+    change_glucose2h = glucose2h - baseline_glucose2h,
     change_insulinf = insulinf - baseline_insulinf,
-    change_hc = hc - baseline_hc,
-    change_glucosef = glucosef - baseline_glucosef
+    change_alt = alt - baseline_alt
   ) %>%
   mutate(
     tstart = case_when(row_number() == 1 ~ age, 
@@ -319,30 +288,31 @@ tdcm_df <- analytic_sample %>%
     tstop = age
   ) %>%
   ungroup() %>% 
-  dplyr::filter(tstart < tstop)
-  # dplyr::filter((tstart < tstop) & (tstop <= censored_age))
+  # dplyr::filter(tstart < tstop)
+  dplyr::filter((tstart < tstop) & (tstop <= censored_age))
 
 # check
-test <- tdcm_df %>% select(study, study_id, age, serumcreatinine,baseline_serumcreatinine,change_serumcreatinine, tstart,tstop)
+test <- tdcm_df %>% select(study, study_id, age, alt,baseline_alt,change_alt, tstart,tstop)
 
-# collinearity
-cor(tdcm_df[, c("homa2ir", "hba1c", "serumcreatinine", "uric_acid", "bmi", "insulinf", "hc", "glucosef")]) 
+# "age" leads to convergence issues, exclude it
+# exclude study_aric and study_cardia because obs = 0 in these studies (when event == 1)
+tdcm_mod <- coxph(Surv(tstart, tstop, event) ~ study_jhs + study_dppos + race
+                  + hba1c + uric_acid + wc + glucosef + insulinf + alt + female, data = tdcm_df)
 
+mard_tdcm <- coxph(Surv(tstart, tstop, mard) ~ study_jhs + study_dppos + race
+                   + hba1c + uric_acid + wc + glucosef + insulinf + alt + female, data = tdcm_df)
+mod_tdcm <- coxph(Surv(tstart, tstop, mod) ~ study_jhs + study_dppos + race
+                  + hba1c + uric_acid + wc + glucosef + insulinf + alt + female, data = tdcm_df)
 
-# exclude correlation coefficient > 0.7 -- highly correlated
-# hba1c ~ glucosef, glucose 2h ~ glucosef, sbp ~ dbp, hc ~ bmi
+# sidd == 1: Hisp, 9; NH Bla, 51; NH Oth, 0; NH Whi, 30; Other, 2
+# merge "NH Other" category to "Other"
+sidd_df <- tdcm_df %>%
+  mutate(race = ifelse(race == "NH Other", "Other", race))
 
-tdcm_mod <- coxph(Surv(tstart, tstop, event) ~ study + race_eth + homa2ir + hba1c + female + serumcreatinine + uric_acid + bmi 
-                  + insulinf + age + hc + glucosef, data = tdcm_df)
-
-mard_tdcm <- coxph(Surv(tstart, tstop, mard) ~ study + race_eth + homa2ir + hba1c + female + serumcreatinine + uric_acid + bmi 
-                   + insulinf + age + hc + glucosef, data = tdcm_df)
-mod_tdcm <- coxph(Surv(tstart, tstop, mod) ~ study + race_eth + homa2ir + hba1c + female + serumcreatinine + uric_acid + bmi 
-                  + insulinf + age + hc + glucosef, data = tdcm_df)
-sidd_tdcm <- coxph(Surv(tstart, tstop, sidd) ~ study + race_eth + homa2ir + hba1c + female + serumcreatinine + uric_acid + bmi 
-                   + insulinf + age + hc + glucosef, data = tdcm_df)
-sird_tdcm <- coxph(Surv(tstart, tstop, sird) ~ study + race_eth + homa2ir + hba1c + female + serumcreatinine + uric_acid + bmi 
-                   + insulinf + age + hc + glucosef, data = tdcm_df)
+sidd_tdcm <- coxph(Surv(tstart, tstop, sidd) ~ study_jhs + study_dppos + race
+                   + hba1c + uric_acid + wc + glucosef + insulinf + alt + female, data = sidd_df)
+sird_tdcm <- coxph(Surv(tstart, tstop, sird) ~ study_jhs + study_dppos + race
+                   + hba1c + uric_acid + wc + glucosef + insulinf + alt + female, data = tdcm_df)
 
 tdcm_results <- bind_rows(
   broom::tidy(mard_tdcm) %>% mutate(model = "MARD"),
@@ -372,46 +342,42 @@ output <- na.omit(df1) %>%
   left_join(na.omit(df2), by = "term") %>% 
   left_join(na.omit(df3), by = "term") %>% 
   left_join(na.omit(df4), by = "term") %>% 
-  write_csv("analysis/dsp02_imputed tdcm results.csv")
+  write_csv("analysis/dspan02_imputed tdcm results.csv")
 #------------------------------------------------------------------------------------------------------------------------
 # TDCM change analysis - baseline + change
  
-tdcm_change <- coxph(Surv(tstart, tstop, event) ~ study + age + race_eth + female 
-                     + baseline_homa2ir + baseline_hba1c + baseline_serumcreatinine + 
-                       baseline_uric_acid + baseline_bmi + baseline_insulinf + 
-                       baseline_hc + baseline_glucosef
-                     + change_homa2ir + change_hba1c + change_serumcreatinine + 
-                       change_uric_acid + change_bmi + change_insulinf + 
-                       change_hc + change_glucosef, data = tdcm_df)
+tdcm_change <- coxph(Surv(tstart, tstop, event) ~ study_jhs + study_dppos + race
+                     + baseline_hba1c + baseline_uric_acid + baseline_wc + baseline_glucosef 
+                     + baseline_insulinf + baseline_alt + female
+                     + change_hba1c + change_uric_acid + change_wc + change_glucosef 
+                     + change_insulinf + change_alt, data = tdcm_df)
 
-mard_change <- coxph(Surv(tstart, tstop, mard) ~ study + age + race_eth + female 
-                     + baseline_homa2ir + baseline_hba1c + baseline_serumcreatinine + 
-                       baseline_uric_acid + baseline_bmi + baseline_insulinf + 
-                       baseline_hc + baseline_glucosef
-                     + change_homa2ir + change_hba1c + change_serumcreatinine + 
-                       change_uric_acid + change_bmi + change_insulinf + 
-                       change_hc + change_glucosef, data = tdcm_df)
-mod_change <- coxph(Surv(tstart, tstop, mod) ~ study + age + race_eth + female 
-                    + baseline_homa2ir + baseline_hba1c + baseline_serumcreatinine + 
-                      baseline_uric_acid + baseline_bmi + baseline_insulinf + 
-                      baseline_hc + baseline_glucosef
-                    + change_homa2ir + change_hba1c + change_serumcreatinine + 
-                      change_uric_acid + change_bmi + change_insulinf + 
-                      change_hc + change_glucosef, data = tdcm_df)
-sidd_change <- coxph(Surv(tstart, tstop, sidd) ~ study + age + race_eth + female 
-                     + baseline_homa2ir + baseline_hba1c + baseline_serumcreatinine + 
-                       baseline_uric_acid + baseline_bmi + baseline_insulinf + 
-                       baseline_hc + baseline_glucosef
-                     + change_homa2ir + change_hba1c + change_serumcreatinine + 
-                       change_uric_acid + change_bmi + change_insulinf + 
-                       change_hc + change_glucosef, data = tdcm_df)
-sird_change <- coxph(Surv(tstart, tstop, sird) ~ study + age + race_eth + female 
-                     + baseline_homa2ir + baseline_hba1c + baseline_serumcreatinine + 
-                       baseline_uric_acid + baseline_bmi + baseline_insulinf + 
-                       baseline_hc + baseline_glucosef
-                     + change_homa2ir + change_hba1c + change_serumcreatinine + 
-                       change_uric_acid + change_bmi + change_insulinf + 
-                       change_hc + change_glucosef, data = tdcm_df)
+mard_change <- coxph(Surv(tstart, tstop, mard) ~ study_jhs + study_dppos + race
+                     + baseline_hba1c + baseline_uric_acid + baseline_wc + baseline_glucosef 
+                     + baseline_insulinf + baseline_alt + female
+                     + change_hba1c + change_uric_acid + change_wc + change_glucosef 
+                     + change_insulinf + change_alt, data = tdcm_df)
+
+mod_change <- coxph(Surv(tstart, tstop, mod) ~ study_jhs + study_dppos + race
+                    + baseline_hba1c + baseline_uric_acid + baseline_wc + baseline_glucosef 
+                    + baseline_insulinf + baseline_alt + female
+                    + change_hba1c + change_uric_acid + change_wc + change_glucosef 
+                    + change_insulinf + change_alt, data = tdcm_df)
+
+sidd_df <- tdcm_df %>%
+  mutate(race = ifelse(race == "NH Other", "Other", race))
+
+sidd_change <- coxph(Surv(tstart, tstop, sidd) ~ study_jhs + study_dppos + race
+                     + baseline_hba1c + baseline_uric_acid + baseline_wc + baseline_glucosef 
+                     + baseline_insulinf + baseline_alt + female
+                     + change_hba1c + change_uric_acid + change_wc + change_glucosef 
+                     + change_insulinf + change_alt, data = sidd_df)
+
+sird_change <- coxph(Surv(tstart, tstop, sird) ~ study_jhs + study_dppos + race
+                     + baseline_hba1c + baseline_uric_acid + baseline_wc + baseline_glucosef 
+                     + baseline_insulinf + baseline_alt + female
+                     + change_hba1c + change_uric_acid + change_wc + change_glucosef 
+                     + change_insulinf + change_alt, data = tdcm_df)
 
 tdcm_change_results <- bind_rows(
   broom::tidy(mard_change) %>% mutate(model = "MARD"),
@@ -440,43 +406,42 @@ output <- na.omit(df1) %>%
   left_join(na.omit(df2), by = "term") %>% 
   left_join(na.omit(df3), by = "term") %>% 
   left_join(na.omit(df4), by = "term") %>% 
-  write_csv("analysis/dsp02_imputed tdcm change results.csv")
+  write_csv("analysis/dspan02_imputed tdcm change results.csv")
 #------------------------------------------------------------------------------------------------------------------------
 # causal survival forest
 # chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://arxiv.org/pdf/2312.02482
 
-analytic_sample <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/analytic_df.RDS"))
+cluster_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan02_cluster df.RDS"))
 
 # outcome
-Y = analytic_sample$time_to_event 
+Y = cluster_df$time_to_event 
 # subgroup indicator
-W_mard = analytic_sample$mard
-W_mod = analytic_sample$mod
-W_sidd = analytic_sample$sidd
-W_sird = analytic_sample$sird
+W_mard = cluster_df$mard
+W_mod = cluster_df$mod
+W_sidd = cluster_df$sidd
+W_sird = cluster_df$sird
 # non-censoring indicator
-D = analytic_sample$event 
+D = cluster_df$event 
 # covariates
 X = cbind(
-  study_aric = analytic_sample$study_aric,
-  study_cardia = analytic_sample$study_cardia,
-  study_dppos = analytic_sample$study_dppos,
-  study_jhs = analytic_sample$study_jhs,
-  study_mesa = analytic_sample$study_mesa,
-  race_nhwhi = analytic_sample$race_nhwhi,
-  race_nhbla = analytic_sample$race_nhbla,
-  race_nhoth = analytic_sample$race_nhoth,
-  race_hisp = analytic_sample$race_hisp,
-  female = analytic_sample$female,
-  age = analytic_sample$age,
-  homa2ir = analytic_sample$homa2ir,
-  hba1c = analytic_sample$hba1c,
-  serumcreatinine = analytic_sample$serumcreatinine,
-  uric_acid = analytic_sample$uric_acid,
-  bmi = analytic_sample$bmi
-  # insulinf = analytic_sample$insulinf,
-  # hc = analytic_sample$hc,
-  # glucosef = analytic_sample$glucosef
+  study_aric = cluster_df$study_aric,
+  study_cardia = cluster_df$study_cardia,
+  study_dppos = cluster_df$study_dppos,
+  study_jhs = cluster_df$study_jhs,
+  race_nhwhi = cluster_df$race_nhwhi,
+  race_nhbla = cluster_df$race_nhbla,
+  race_nhoth = cluster_df$race_nhoth,
+  race_hisp = cluster_df$race_hisp,
+  hba1c = cluster_df$hba1c,
+  uric_acid = cluster_df$uric_acid,
+  wc = cluster_df$wc,
+  glucosef = cluster_df$glucosef,
+  age = cluster_df$age,
+  glucose2h = cluster_df$glucose2h,
+  insulinf = cluster_df$insulinf,
+  alt = cluster_df$alt,
+  female = cluster_df$female
+  
 )
 
 failure_times <- seq(0, 15, by=0.5)
@@ -490,9 +455,9 @@ abline(v=720,lty=2)
 
 library(grf)
 csf_mard <- causal_survival_forest(X, Y, W_mard, D, W.hat = 0.5, target = "RMST", horizon = 15, failure.times = failure_times)
-csf_mod <- causal_survival_forest(X, Y, W_mod, D, W.hat = 0.5, target = "RMST", horizon = 15)
-csf_sidd <- causal_survival_forest(X, Y, W_sidd, D, W.hat = 0.5, target = "RMST", horizon = 15)
-csf_sird <- causal_survival_forest(X, Y, W_sird, D, W.hat = 0.5, target = "RMST", horizon = 15)
+csf_mod <- causal_survival_forest(X, Y, W_mod, D, W.hat = 0.5, target = "RMST", horizon = 15, failure.times = failure_times)
+csf_sidd <- causal_survival_forest(X, Y, W_sidd, D, W.hat = 0.5, target = "RMST", horizon = 15, failure.times = failure_times)
+csf_sird <- causal_survival_forest(X, Y, W_sird, D, W.hat = 0.5, target = "RMST", horizon = 15, failure.times = failure_times)
 
 blp_mard <- best_linear_projection(csf_mard, X)
 blp_mod <- best_linear_projection(csf_mod, X)
