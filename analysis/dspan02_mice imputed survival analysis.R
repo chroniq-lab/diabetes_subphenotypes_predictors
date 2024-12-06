@@ -75,14 +75,18 @@ ggplot(data=cross_df,aes(x=time_to_event,group=event,fill=factor(event))) +
   geom_histogram(alpha=0.5,position=position_dodge(width=0.9),bins=10)
 
 
-cox_mod <- coxph(Surv(time_to_event, event) ~ study_aric + study_cardia + study_dppos + study_jhs + study_mesa + age + female 
+cox_mod <- coxph(Surv(time_to_event, event) ~ study_aric + study_cardia + study_dppos + study_jhs + age + female 
                                            + race_nhwhi + race_nhbla + race_nhoth + race_hisp + bmi + hba1c + sbp + dbp + hdlc + ldlc 
                                            + homa2b + homa2ir + height + wc + insulinf + glucosef + glucose2h + tgl
                                            + serumcreatinine + urinecreatinine + egfr + apo_a + apo_b + uric_acid 
                                            + vldlc + hc + triceps + iliac + abdominal + medial + ast + alt + urinealbumin
                                            + weight, data = cross_df)
-summary(cox_mod)
 
+cox_mod_var8 <- coxph(Surv(time_to_event, event) ~ age + bmi + hba1c + homa2b + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
+                      data = cross_df)
+
+summary(cox_mod)
+summary(cox_mod_var8)
 # p>.05 covariates: insulinf, abdominal
 
 #------------------------------------------------------------------------------------------------------------------------
@@ -255,6 +259,50 @@ output <- na.omit(df1) %>%
   left_join(na.omit(df3), by = "term") %>% 
   left_join(na.omit(df4), by = "term")  %>% 
   write_csv("analysis/dspan02_imputed cox ph results.csv")
+
+#--------------------------------------------------------------------
+mard_cp_var8 <- coxph(Surv(time_to_event, mard) ~ age + bmi + hba1c + homa2b + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
+                 data = cross_df)
+
+mod_cp_var8 <- coxph(Surv(time_to_event, mod) ~ age + bmi + hba1c + homa2b + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
+                data = cross_df)
+
+sidd_cp_var8 <- coxph(Surv(time_to_event, sidd) ~ age + bmi + hba1c + homa2b + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
+                 data = cross_df)
+
+sird_cp_var8 <- coxph(Surv(time_to_event, sird) ~ age + bmi + hba1c + homa2b + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
+                 data = cross_df)
+
+
+coxph_results <- bind_rows(
+  broom::tidy(mard_cp_var8) %>% mutate(model = "MARD"),
+  broom::tidy(mod_cp_var8) %>% mutate(model = "MOD"),
+  broom::tidy(sidd_cp_var8) %>% mutate(model = "SIDD"),
+  broom::tidy(sird_cp_var8) %>% mutate(model = "SIRD")) 
+
+# convert to HR
+coxph_output <- coxph_results %>% 
+  mutate(HR = exp(estimate),
+         lci = exp(estimate - 1.96 * std.error),
+         uci = exp(estimate + 1.96 * std.error)) %>% 
+  mutate(coef_ci = paste0(round(HR, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
+  pivot_wider(names_from = model, values_from = coef_ci) %>% 
+  dplyr::select(term, MARD, MOD, SIDD, SIRD)
+
+df1 <- coxph_output %>% 
+  dplyr::select(term, MARD) 
+df2 <- coxph_output %>% 
+  dplyr::select(term, MOD)
+df3 <- coxph_output %>% 
+  dplyr::select(term, SIDD)
+df4 <- coxph_output %>% 
+  dplyr::select(term, SIRD)
+
+output <- na.omit(df1) %>% 
+  left_join(na.omit(df2), by = "term") %>% 
+  left_join(na.omit(df3), by = "term") %>% 
+  left_join(na.omit(df4), by = "term")  %>% 
+  write_csv("analysis/dspan02_imputed cox ph results with 8 variables.csv")
 #------------------------------------------------------------------------------------------------------------------------
 # TDCM analysis
 # Start time: previous age; End time: current age at visit
@@ -280,7 +328,23 @@ tdcm_df <- analytic_sample %>%
     change_glucosef = glucosef - baseline_glucosef,
     change_glucose2h = glucose2h - baseline_glucose2h,
     change_insulinf = insulinf - baseline_insulinf,
-    change_alt = alt - baseline_alt
+    change_alt = alt - baseline_alt,
+    
+    # for 8 variables
+    baseline_bmi = if_else(row_number() == 1, bmi, dplyr::lag(bmi, 1, default = NA)),
+    baseline_egfr = if_else(row_number() == 1, egfr_ckdepi_2021, dplyr::lag(egfr_ckdepi_2021, 1, default = NA)),
+    baseline_ldlc = if_else(row_number() == 1, ldlc, dplyr::lag(ldlc, 1, default = NA)),
+    baseline_homa2b = if_else(row_number() == 1, homa2b, dplyr::lag(homa2b, 1, default = NA)),
+    baseline_homa2ir = if_else(row_number() == 1, homa2ir, dplyr::lag(homa2ir, 1, default = NA)),
+    baseline_sbp = if_else(row_number() == 1, sbp, dplyr::lag(sbp, 1, default = NA)),
+    
+    change_bmi = bmi - baseline_bmi,
+    change_egfr = egfr - baseline_egfr,
+    change_ldlc = ldlc - baseline_ldlc,
+    change_homa2b = homa2b - baseline_homa2b,
+    change_homa2ir = homa2ir - baseline_homa2ir,
+    change_sbp = sbp - baseline_sbp,
+    
   ) %>%
   mutate(
     tstart = case_when(row_number() == 1 ~ age, 
@@ -343,6 +407,44 @@ output <- na.omit(df1) %>%
   left_join(na.omit(df3), by = "term") %>% 
   left_join(na.omit(df4), by = "term") %>% 
   write_csv("analysis/dspan02_imputed tdcm results.csv")
+
+#----------------------------------------------------------------
+tdcm_mod_var7 <- coxph(Surv(tstart, tstop, event) ~ bmi + hba1c + homa2b + homa2ir + ldlc + sbp + egfr_ckdepi_2021, data = tdcm_df)
+
+mard_tdcm_var7 <- coxph(Surv(tstart, tstop, mard) ~ bmi + hba1c + homa2b + homa2ir + ldlc + sbp + egfr_ckdepi_2021, data = tdcm_df)
+mod_tdcm_var7 <- coxph(Surv(tstart, tstop, mod) ~ bmi + hba1c + homa2b + homa2ir + ldlc + sbp + egfr_ckdepi_2021, data = tdcm_df)
+sidd_tdcm_var7 <- coxph(Surv(tstart, tstop, sidd) ~ bmi + hba1c + homa2b + homa2ir + ldlc + sbp + egfr_ckdepi_2021, data = tdcm_df)
+sird_tdcm_var7 <- coxph(Surv(tstart, tstop, sird) ~ bmi + hba1c + homa2b + homa2ir + ldlc + sbp + egfr_ckdepi_2021, data = tdcm_df)
+
+tdcm_results <- bind_rows(
+  broom::tidy(mard_tdcm_var7) %>% mutate(model = "MARD"),
+  broom::tidy(mod_tdcm_var7) %>% mutate(model = "MOD"),
+  broom::tidy(sidd_tdcm_var7) %>% mutate(model = "SIDD"),
+  broom::tidy(sird_tdcm_var7) %>% mutate(model = "SIRD")) 
+
+# covert to Hazard Ratio
+tdcm_output <- tdcm_results %>% 
+  mutate(HR = exp(estimate),
+         lci = exp(estimate - 1.96 * std.error),
+         uci = exp(estimate + 1.96 * std.error)) %>% 
+  mutate(coef_ci = paste0(round(HR, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
+  pivot_wider(names_from = model, values_from = coef_ci) %>% 
+  dplyr::select(term, MARD, MOD, SIDD, SIRD) 
+
+df1 <- tdcm_output %>% 
+  dplyr::select(term, MARD) 
+df2 <- tdcm_output %>% 
+  dplyr::select(term, MOD)
+df3 <- tdcm_output %>% 
+  dplyr::select(term, SIDD)
+df4 <- tdcm_output %>% 
+  dplyr::select(term, SIRD)
+
+output <- na.omit(df1) %>% 
+  left_join(na.omit(df2), by = "term") %>% 
+  left_join(na.omit(df3), by = "term") %>% 
+  left_join(na.omit(df4), by = "term") %>% 
+  write_csv("analysis/dspan02_imputed tdcm results with 7 variables.csv")
 #------------------------------------------------------------------------------------------------------------------------
 # TDCM change analysis - baseline + change
  
@@ -407,6 +509,61 @@ output <- na.omit(df1) %>%
   left_join(na.omit(df3), by = "term") %>% 
   left_join(na.omit(df4), by = "term") %>% 
   write_csv("analysis/dspan02_imputed tdcm change results.csv")
+
+#-------------------------------------------------------------------
+tdcm_change_var7 <- coxph(Surv(tstart, tstop, event) ~ baseline_hba1c + baseline_homa2b + baseline_homa2ir + baseline_ldlc 
+                     + baseline_bmi + baseline_sbp + baseline_egfr
+                     + change_hba1c + change_homa2b + change_homa2ir + change_ldlc 
+                     + change_bmi + change_sbp + change_egfr, data = tdcm_df)
+
+mard_change_var7 <- coxph(Surv(tstart, tstop, mard) ~ baseline_hba1c + baseline_homa2b + baseline_homa2ir + baseline_ldlc 
+                     + baseline_bmi + baseline_sbp + baseline_egfr
+                     + change_hba1c + change_homa2b + change_homa2ir + change_ldlc 
+                     + change_bmi + change_sbp + change_egfr, data = tdcm_df)
+
+mod_change_var7 <- coxph(Surv(tstart, tstop, mod) ~ baseline_hba1c + baseline_homa2b + baseline_homa2ir + baseline_ldlc 
+                    + baseline_bmi + baseline_sbp + baseline_egfr
+                    + change_hba1c + change_homa2b + change_homa2ir + change_ldlc 
+                    + change_bmi + change_sbp + change_egfr, data = tdcm_df)
+
+sidd_change_var7 <- coxph(Surv(tstart, tstop, sidd) ~ baseline_hba1c + baseline_homa2b + baseline_homa2ir + baseline_ldlc 
+                     + baseline_bmi + baseline_sbp + baseline_egfr
+                     + change_hba1c + change_homa2b + change_homa2ir + change_ldlc 
+                     + change_bmi + change_sbp + change_egfr, data = tdcm_df)
+
+sird_change_var7 <- coxph(Surv(tstart, tstop, sird) ~ baseline_hba1c + baseline_homa2b + baseline_homa2ir + baseline_ldlc 
+                     + baseline_bmi + baseline_sbp + baseline_egfr
+                     + change_hba1c + change_homa2b + change_homa2ir + change_ldlc 
+                     + change_bmi + change_sbp + change_egfr, data = tdcm_df)
+
+tdcm_change_results <- bind_rows(
+  broom::tidy(mard_change_var7) %>% mutate(model = "MARD"),
+  broom::tidy(mod_change_var7) %>% mutate(model = "MOD"),
+  broom::tidy(sidd_change_var7) %>% mutate(model = "SIDD"),
+  broom::tidy(sird_change_var7) %>% mutate(model = "SIRD")) 
+
+tdcm_change_output <- tdcm_change_results %>% 
+  mutate(HR = exp(estimate),
+         lci = exp(estimate - 1.96 * std.error),
+         uci = exp(estimate + 1.96 * std.error)) %>% 
+  mutate(coef_ci = paste0(round(HR, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
+  pivot_wider(names_from = model, values_from = coef_ci) %>% 
+  dplyr::select(term, MARD, MOD, SIDD, SIRD) 
+
+df1 <- tdcm_change_output %>% 
+  dplyr::select(term, MARD) 
+df2 <- tdcm_change_output %>% 
+  dplyr::select(term, MOD)
+df3 <- tdcm_change_output %>% 
+  dplyr::select(term, SIDD)
+df4 <- tdcm_change_output %>% 
+  dplyr::select(term, SIRD)
+
+output <- na.omit(df1) %>% 
+  left_join(na.omit(df2), by = "term") %>% 
+  left_join(na.omit(df3), by = "term") %>% 
+  left_join(na.omit(df4), by = "term") %>% 
+  write_csv("analysis/dspan02_imputed tdcm change results with 7 variables.csv")
 #------------------------------------------------------------------------------------------------------------------------
 # causal survival forest
 # chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://arxiv.org/pdf/2312.02482
