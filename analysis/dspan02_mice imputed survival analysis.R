@@ -657,10 +657,74 @@ output <- na.omit(df1) %>%
   left_join(na.omit(df2), by = "term") %>% 
   left_join(na.omit(df3), by = "term") %>% 
   left_join(na.omit(df4), by = "term") %>% 
-  write_csv("analysis/dsp02_imputed csf results.csv")
+  write_csv("analysis/dspan02_imputed causal survival forest results.csv")
 
 average_treatment_effect(csf)
 # Retrieve out-of-bag CATE estimates 
 tau.hat= predict(csf)$predictions 
 summary(tau.hat)
 
+#-------------------------------------------------------------------------------
+# covariates 
+X = cbind(
+  hba1c = cluster_df$hba1c,
+  bmi = cluster_df$bmi,
+  ldlc = cluster_df$ldlc,
+  homa2b = cluster_df$homa2b,
+  homa2ir = cluster_df$homa2ir,
+  age = cluster_df$age,
+  sbp = cluster_df$sbp,
+  egfr_ckdepi_2021 = cluster_df$egfr_ckdepi_2021
+  
+)
+
+failure_times <- seq(0, 15, by=0.5)
+
+library(grf)
+csf_mard_var8 <- causal_survival_forest(X, Y, W_mard, D, W.hat = 0.5, target = "RMST", horizon = 15, failure.times = failure_times)
+csf_mod_var8 <- causal_survival_forest(X, Y, W_mod, D, W.hat = 0.5, target = "RMST", horizon = 15, failure.times = failure_times)
+csf_sidd_var8 <- causal_survival_forest(X, Y, W_sidd, D, W.hat = 0.5, target = "RMST", horizon = 15, failure.times = failure_times)
+csf_sird_var8 <- causal_survival_forest(X, Y, W_sird, D, W.hat = 0.5, target = "RMST", horizon = 15, failure.times = failure_times)
+
+blp_mard_var8 <- best_linear_projection(csf_mard_var8, X)
+blp_mod_var8 <- best_linear_projection(csf_mod_var8, X)
+blp_sidd_var8 <- best_linear_projection(csf_sidd_var8, X)
+blp_sird_var8 <- best_linear_projection(csf_sird_var8, X)
+
+csf_results <- bind_rows(as.data.frame.matrix(blp_mard_var8) %>% 
+                           mutate(model = "MARD"),
+                         as.data.frame.matrix(blp_mod_var8) %>% 
+                           mutate(model = "MOD"),
+                         as.data.frame.matrix(blp_sidd_var8) %>% 
+                           mutate(model = "SIDD"),
+                         as.data.frame.matrix(blp_sird_var8) %>% 
+                           mutate(model = "SIRD")) %>% 
+  rename(estimate = Estimate,
+         std_error = `Std. Error`,
+         t_value = `t value`,
+         p_value = `Pr(>|t|)`) %>% 
+  rownames_to_column(var = "term") %>% 
+  mutate(term = gsub("\\.{3}\\d+$", "", term))
+
+csf_output <- csf_results %>% 
+  mutate(HR = exp(estimate),
+         lci = exp(estimate - 1.96 * std_error),
+         uci = exp(estimate + 1.96 * std_error)) %>% 
+  mutate(coef_ci = paste0(round(HR, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
+  pivot_wider(names_from = model, values_from = coef_ci) %>% 
+  dplyr::select(term, MARD, MOD, SIDD, SIRD) 
+
+df1 <- csf_output %>% 
+  dplyr::select(term, MARD) 
+df2 <- csf_output %>% 
+  dplyr::select(term, MOD)
+df3 <- csf_output %>% 
+  dplyr::select(term, SIDD)
+df4 <- csf_output %>% 
+  dplyr::select(term, SIRD)
+
+output <- na.omit(df1) %>% 
+  left_join(na.omit(df2), by = "term") %>% 
+  left_join(na.omit(df3), by = "term") %>% 
+  left_join(na.omit(df4), by = "term") %>% 
+  write_csv("dspan02_imputed causal survival forest results with 8 variables.csv")
