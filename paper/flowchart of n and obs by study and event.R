@@ -7,8 +7,8 @@ all_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working
   # Restrict to observations within 15 years of earliest age
   dplyr::filter(age <= (min_age + 15)) %>%
   # There are individuals whose dmagediag < minimum age
-  # exclude people being diagnosed before baseline or at baseline (1st visit)
-  dplyr::filter(is.na(dmagediag) | (age <= dmagediag)) %>% 
+  # exclude people being diagnosed at baseline (1st visit)
+  dplyr::filter(is.na(dmagediag) | ((age <= dmagediag) & (min_age != dmagediag))) %>% 
   
   mutate(event = case_when(# Individuals who are never diagnosed
     is.na(dmagediag) ~ 0,
@@ -39,7 +39,7 @@ all_df %>%
 #------------------------------------------------------------------------------------
 # at least 1 visit time before diagnosis
 mt1vst <- all_df %>% 
-  dplyr::filter(event == 0 | (dmagediag != min_age))
+  dplyr::filter((event == 1 & dmagediag > age) | event == 0)
   
 # obs
 table(mt1vst$study)
@@ -57,8 +57,8 @@ mt1vst %>%
 
 #------------------------------------------------------------------------------------
 # with available cluster
-clus_ava <- all_df %>% 
-  dplyr::filter(event == 0 | ((dmagediag != min_age) & !is.na(cluster)))
+clus_ava <- mt1vst %>% 
+  dplyr::filter((event == 1 & !is.na(bmi) & !is.na(hba1c)) | event == 0)
   
 # obs
 table(clus_ava$study)
