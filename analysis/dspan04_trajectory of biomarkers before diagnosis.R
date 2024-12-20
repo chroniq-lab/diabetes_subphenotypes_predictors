@@ -16,7 +16,7 @@
 # 4. Fit a model that accounts for clustering
 # study_id: Variable that is a unique ID for each individual
 library(geepack)
-m1 = geeglm(homa2b ~ subtype*ns(t) + age + sex + study + race, family = gaussian(),data = df,id = study_id,corstr = "exchangeable")
+m1 = geeglm(homa2b ~ subtype*ns(t) + max_age + sex + study + race, family = gaussian(),data = df,id = study_id,corstr = "exchangeable")
 
 # 5. Estimate predicted trajectories for each subtype over time along with confidence intervals
 # https://stats.stackexchange.com/questions/109369/how-can-i-estimate-model-predicted-means-a-k-a-marginal-means-lsmeans-or-em
