@@ -22,7 +22,7 @@ continuous_vars <- c("age", "sbp", "dbp", "height", "wc", "bmi", "hba1c", "insul
 
 proportion_vars <- c("female")
 
-grouped_vars <- c("study","race_eth")
+grouped_vars <- c("study","race_eth","race")
 
 # Moved dmagediag to an ID variable
 id_vars <- c("study_id",  "visit", "year", "exam", "cluster_study_id", "cluster", "newdm", "dmagediag",

@@ -45,12 +45,8 @@ nodm15y %>%
 # at least have 2 wave
 nodm2wv <- nodm15y %>% 
   group_by(study, study_id) %>%
-  dplyr::filter(!is.na(age) & age >= min_age) %>% 
-  add_count(joint_id, name = "count_valid_ages") %>%
-  # Only keep those groups with at least 2 non-missing ages
-  dplyr::filter(count_valid_ages >= 2) %>%
-  # Optionally remove the helper columns if they are no longer needed
-  select(-min_age, -count_valid_ages) %>%
+  mutate(has_age_after_min = any(age > min_age)) %>% 
+  dplyr::filter(has_age_after_min) %>% 
   ungroup()
 
 # obs
@@ -98,7 +94,7 @@ dm15y %>%
 clus_avaid <- dm15y %>% 
   dplyr::filter(study != "dppos") %>% 
   group_by(study, study_id) %>%
-  dplyr::filter((age == dmagediag) & !is.na(bmi) & !is.na(hba1c)) %>% 
+  dplyr::filter((age == dmagediag) & !is.na(cluster)) %>% 
   ungroup()
 
 # N = 1387
@@ -107,7 +103,7 @@ clus_avaid_dpp <- dm15y %>%
   mutate(age_int = as.integer(age),
          dmagediag_int = as.integer(dmagediag)) %>% 
   group_by(study, study_id) %>%
-  dplyr::filter((age_int == dmagediag_int) & !is.na(bmi) & !is.na(hba1c)) %>% 
+  dplyr::filter((age_int == dmagediag_int) & !is.na(cluster)) %>% 
   ungroup()
 
 # N = 2135
