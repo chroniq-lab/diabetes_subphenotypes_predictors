@@ -14,6 +14,13 @@ mard_cp <- list()
 mod_cp <- list()
 sidd_cp <- list()
 sird_cp <- list()
+cp_results <- list()
+cp_output <- list()
+df1 <- list()
+df2 <- list()
+df3 <- list()
+df4 <- list()
+coxph_output <- list()
 
 # Cox PH model
 for (i in 1:length(ipcw_dfs)) {
@@ -56,22 +63,40 @@ for (i in 1:length(ipcw_dfs)) {
                         data = cross_df, weights = ipcw_cluster)
   
   
+  cp_results[[i]] <- bind_rows(
+    broom::tidy(mard_cp[[i]]) %>% mutate(model = "MARD"),
+    broom::tidy(mod_cp[[i]]) %>% mutate(model = "MOD"),
+    broom::tidy(sidd_cp[[i]]) %>% mutate(model = "SIDD"),
+    broom::tidy(sird_cp[[i]]) %>% mutate(model = "SIRD")) 
+  
+  # covert to Hazard Ratio
+  cp_output[[i]] <- cp_results[[i]] %>% 
+    mutate(HR = exp(estimate),
+           lci = exp(estimate - 1.96 * std.error),
+           uci = exp(estimate + 1.96 * std.error)) %>% 
+    mutate(coef_ci = paste0(round(HR, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
+    pivot_wider(names_from = model, values_from = coef_ci) %>% 
+    dplyr::select(term, MARD, MOD, SIDD, SIRD) 
+  
+  df1[[i]] <- cp_output[[i]] %>% 
+    dplyr::select(term, MARD) 
+  df2[[i]] <- cp_output[[i]] %>% 
+    dplyr::select(term, MOD)
+  df3[[i]] <- cp_output[[i]] %>% 
+    dplyr::select(term, SIDD)
+  df4[[i]] <- cp_output[[i]] %>% 
+    dplyr::select(term, SIRD)
+  
+  coxph_output[[i]] <- na.omit(df1[[i]]) %>% 
+    left_join(na.omit(df2[[i]]), by = "term") %>% 
+    left_join(na.omit(df3[[i]]), by = "term") %>% 
+    left_join(na.omit(df4[[i]]), by = "term") %>% 
+    mutate(model = paste0("m", i))
+  
 }
 
-
-# Pooling coefficients ------------
-source("functions/clean_mi_contrasts.R")
-
-overall_cp_out = clean_mi_contrasts(overall_cp,link="coxph")
-
-
-
-
-
-
-
-
-
+coxph_output_results <- bind_rows(coxph_output) %>% 
+  write_csv(.,"analysis/dspan03_cox ph with multiple imputation.csv")
 
 
 #--------------------------------------------------------------------------------------------------------------------
@@ -82,9 +107,16 @@ mard_tdcm <- list()
 mod_tdcm <- list()
 sidd_tdcm <- list()
 sird_tdcm <- list()
+tdcm_results <- list()
+tdcm_output <- list()
+df1 <- list()
+df2 <- list()
+df3 <- list()
+df4 <- list()
+output <- list()
 
 for (i in 1:length(ipcw_dfs)) {
-  df <- ipcw_dfs[[1]]  
+  df <- ipcw_dfs[[i]]  
   
   cluster_df <- df %>% 
     mutate(mard = case_when(cluster == "MARD" ~ 1,
@@ -106,8 +138,13 @@ for (i in 1:length(ipcw_dfs)) {
     ) %>%
     ungroup() %>% 
     # dplyr::filter(tstart < tstop)
-    dplyr::filter((tstart < tstop) & (tstop <= censored_age))
+    dplyr::filter((tstart < tstop) & (tstop <= censored_age)) %>% 
+    mutate(across(c(bmi, hba1c, homa2b, homa2ir, ldlc, sbp, egfr_ckdepi_2021), ~replace(., is.infinite(.), NA)))
 
+  # error due to 0 ppl in NH Other (sidd == 1), ignore this category
+  sidd_df <- tdcm_df %>%
+    mutate(race = case_when(race == "NH Other" ~ "Other", 
+                            TRUE ~ race))
   
   overall_tdcm[[i]] <- coxph(Surv(tstart, tstop, event) ~ study + female + race + min_age + bmi + hba1c + homa2b 
                              + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
@@ -123,16 +160,47 @@ for (i in 1:length(ipcw_dfs)) {
   
   sidd_tdcm[[i]] <- coxph(Surv(tstart, tstop, sidd) ~ study + female + race + min_age + bmi + hba1c + homa2b 
                           + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
-                          data = tdcm_df, weights = ipcw_cluster)
+                          data = sidd_df, weights = ipcw_cluster)
   
   sird_tdcm[[i]] <- coxph(Surv(tstart, tstop, sird) ~ study + female + race + min_age + bmi + hba1c + homa2b 
                           + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
                           data = tdcm_df, weights = ipcw_cluster)
   
   
+  tdcm_results[[i]] <- bind_rows(
+    broom::tidy(mard_tdcm[[i]]) %>% mutate(model = "MARD"),
+    broom::tidy(mod_tdcm[[i]]) %>% mutate(model = "MOD"),
+    broom::tidy(sidd_tdcm[[i]]) %>% mutate(model = "SIDD"),
+    broom::tidy(sird_tdcm[[i]]) %>% mutate(model = "SIRD")) 
+  
+  # covert to Hazard Ratio
+  tdcm_output[[i]] <- tdcm_results[[i]] %>% 
+    mutate(HR = exp(estimate),
+           lci = exp(estimate - 1.96 * std.error),
+           uci = exp(estimate + 1.96 * std.error)) %>% 
+    mutate(coef_ci = paste0(round(HR, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
+    pivot_wider(names_from = model, values_from = coef_ci) %>% 
+    dplyr::select(term, MARD, MOD, SIDD, SIRD) 
+  
+  df1[[i]] <- tdcm_output[[i]] %>% 
+    dplyr::select(term, MARD) 
+  df2[[i]] <- tdcm_output[[i]] %>% 
+    dplyr::select(term, MOD)
+  df3[[i]] <- tdcm_output[[i]] %>% 
+    dplyr::select(term, SIDD)
+  df4[[i]] <- tdcm_output[[i]] %>% 
+    dplyr::select(term, SIRD)
+  
+  output[[i]] <- na.omit(df1[[i]]) %>% 
+    left_join(na.omit(df2[[i]]), by = "term") %>% 
+    left_join(na.omit(df3[[i]]), by = "term") %>% 
+    left_join(na.omit(df4[[i]]), by = "term") %>% 
+    mutate(model = paste0("m", i))
+
 }
 
-
+tdcm_output_results <- bind_rows(output) %>% 
+  write_csv(.,"analysis/dspan03_tdcm with multiple imputation.csv")
 
 #--------------------------------------------------------------------------------------------------------------------
 # mixed effect model
