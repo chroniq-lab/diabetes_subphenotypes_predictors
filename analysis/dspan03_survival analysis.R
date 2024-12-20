@@ -41,7 +41,8 @@ for (i in 1:length(ipcw_dfs)) {
   cross_df <- cluster_df %>% 
     group_by(study_id,study) %>% 
     dplyr::filter(age == min(age)) %>% 
-    ungroup()
+    ungroup() %>% 
+    mutate(across(c(bmi, hba1c, homa2b, homa2ir, ldlc, sbp, egfr_ckdepi_2021), ~replace(., is.infinite(.), NA)))
   
   overall_cp[[i]] <- coxph(Surv(time_to_event, event) ~ study + race + female + age + bmi + hba1c + homa2b + homa2ir 
                            + ldlc + sbp + egfr_ckdepi_2021, 
@@ -65,6 +66,7 @@ for (i in 1:length(ipcw_dfs)) {
   
   
   cp_results[[i]] <- bind_rows(
+    broom::tidy(overall_cp[[i]]) %>% mutate(model = "Overall"),
     broom::tidy(mard_cp[[i]]) %>% mutate(model = "MARD"),
     broom::tidy(mod_cp[[i]]) %>% mutate(model = "MOD"),
     broom::tidy(sidd_cp[[i]]) %>% mutate(model = "SIDD"),
@@ -77,7 +79,7 @@ for (i in 1:length(ipcw_dfs)) {
            uci = exp(estimate + 1.96 * std.error)) %>% 
     mutate(coef_ci = paste0(round(HR, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
     pivot_wider(names_from = model, values_from = coef_ci) %>% 
-    dplyr::select(term, MARD, MOD, SIDD, SIRD) 
+    dplyr::select(term, Overall, MARD, MOD, SIDD, SIRD) 
   
   df0[[i]] <- cp_output[[i]] %>% 
     dplyr::select(term, Overall) 
@@ -118,7 +120,7 @@ df1 <- list()
 df2 <- list()
 df3 <- list()
 df4 <- list()
-output <- list()
+tdcmfinal_output <- list()
 
 for (i in 1:length(ipcw_dfs)) {
   df <- ipcw_dfs[[i]]  
@@ -186,7 +188,7 @@ for (i in 1:length(ipcw_dfs)) {
            uci = exp(estimate + 1.96 * std.error)) %>% 
     mutate(coef_ci = paste0(round(HR, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
     pivot_wider(names_from = model, values_from = coef_ci) %>% 
-    dplyr::select(term, MARD, MOD, SIDD, SIRD) 
+    dplyr::select(term, Overall, MARD, MOD, SIDD, SIRD) 
   
   df0[[i]] <- tdcm_output[[i]] %>% 
     dplyr::select(term, Overall)
@@ -219,6 +221,14 @@ mard_mix <- list()
 mod_mix <- list()
 sidd_mix <- list()
 sird_mix <- list()
+mix_results <- list()
+mix_output <- list()
+df0 <- list()
+df1 <- list()
+df2 <- list()
+df3 <- list()
+df4 <- list()
+mixfinal_output <- list()
 
 for (i in 1:length(ipcw_dfs)) {
   df <- ipcw_dfs[[1]] 
@@ -236,31 +246,66 @@ for (i in 1:length(ipcw_dfs)) {
            time_cub = time_to_event^3)
   
   
-  overall_mix[[i]] <- glmer(event ~ time_to_event + (1|study) + female + race + min_age + bmi + hba1c + homa2b 
+  overall_mix[[i]] <- glm(event ~ study + age + female + race + bmi + hba1c + homa2b 
                              + homa2ir + ldlc + sbp + egfr_ckdepi_2021,
                              data = cluster_df, weights = ipcw_cluster, family = binomial(link = "logit"))
   
-  mard_mix[[i]] <- glmer(mard ~ time_to_event + (1|study) + female + race + min_age + bmi + hba1c + homa2b 
+  mard_mix[[i]] <- glm(mard ~ study + age + female + race + bmi + hba1c + homa2b 
                          + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
                          data = cluster_df, weights = ipcw_cluster, family = binomial(link = "logit"))
   
-  mod_mix[[i]] <- glmer(mod ~ time_to_event + (1|study) + female + race + min_age + bmi + hba1c + homa2b 
+  mod_mix[[i]] <- glm(mod ~ study + age + female + race + bmi + hba1c + homa2b 
                         + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
                         data = cluster_df, weights = ipcw_cluster, family = binomial(link = "logit"))
   
-  sidd_mix[[i]] <- glmer(sidd ~ time_to_event + (1|study) + female + race + min_age + bmi + hba1c + homa2b 
+  sidd_mix[[i]] <- glm(sidd ~ study + age + female + race + bmi + hba1c + homa2b 
                          + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
                          data = cluster_df, weights = ipcw_cluster, family = binomial(link = "logit"))
   
-  sird_mix[[i]] <- glmer(sird ~ time_to_event + (1|study) + female + race + min_age + bmi + hba1c + homa2b 
+  sird_mix[[i]] <- glm(sird ~ study + age + female + race + bmi + hba1c + homa2b 
                          + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
                          data = cluster_df, weights = ipcw_cluster, family = binomial(link = "logit"))
   
+  
+  mix_results[[i]] <- bind_rows(
+    broom::tidy(overall_mix[[i]]) %>% mutate(model = "Overall"),
+    broom::tidy(mard_mix[[i]]) %>% mutate(model = "MARD"),
+    broom::tidy(mod_mix[[i]]) %>% mutate(model = "MOD"),
+    broom::tidy(sidd_mix[[i]]) %>% mutate(model = "SIDD"),
+    broom::tidy(sird_mix[[i]]) %>% mutate(model = "SIRD")) 
+  
+  # covert to Hazard Ratio
+  mix_output[[i]] <- mix_results[[i]] %>% 
+    mutate(RR = exp(estimate),
+           lci = exp(estimate - 1.96 * std.error),
+           uci = exp(estimate + 1.96 * std.error)) %>% 
+    mutate(coef_ci = paste0(round(RR, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
+    pivot_wider(names_from = model, values_from = coef_ci) %>% 
+    dplyr::select(term, Overall, MARD, MOD, SIDD, SIRD) 
+  
+  df0[[i]] <- mix_output[[i]] %>% 
+    dplyr::select(term, Overall)
+  df1[[i]] <- mix_output[[i]] %>% 
+    dplyr::select(term, MARD) 
+  df2[[i]] <- mix_output[[i]] %>% 
+    dplyr::select(term, MOD)
+  df3[[i]] <- mix_output[[i]] %>% 
+    dplyr::select(term, SIDD)
+  df4[[i]] <- mix_output[[i]] %>% 
+    dplyr::select(term, SIRD)
+  
+  mixfinal_output[[i]] <- na.omit(df0[[i]]) %>% 
+    left_join(na.omit(df1[[i]]), by = "term") %>% 
+    left_join(na.omit(df2[[i]]), by = "term") %>% 
+    left_join(na.omit(df3[[i]]), by = "term") %>% 
+    left_join(na.omit(df4[[i]]), by = "term") %>% 
+    mutate(model = paste0("m", i))
   
 }
 
 
-
+mix_output_results <- bind_rows(mixfinal_output) %>% 
+  write_csv(.,"analysis/dspan03_mixed model with multiple imputation.csv")
 
 
 
