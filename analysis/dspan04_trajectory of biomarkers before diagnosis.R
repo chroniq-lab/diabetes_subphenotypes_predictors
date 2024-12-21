@@ -92,12 +92,12 @@ bind_rows(out1 %>% mutate(outcome = "HOMA2B"),
   write_csv(.,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan04_modeled trajectories of biomarkers.csv"))
 
 cluster_not2d_colors = c(cluster_colors,"#AC94F4")
-names(cluster_not2d_colors) = c(cluster_labels,"No T2D")
+names(cluster_not2d_colors) = c(names(cluster_colors),"No T2D")
 
 fig_homa2b = out1 %>% 
   as.data.frame() %>% 
-  mutate(cluster = factor(group,levels=c("NOT2D","SIDD","SIRD","MOD","MARD"),
-                          labels=c("No T2D","SIDD","SIRD","MOD","MARD"))) %>% 
+  mutate(cluster = factor(group,levels=c("NOT2D","MOD","SIRD","SIDD","MARD"),
+                          labels=c("No T2D","MOD","SIRD","SIDD","MARD"))) %>% 
   ggplot(data=.,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high,col=cluster)) +
   geom_path() +
   geom_ribbon(fill=NA,linetype = 2) +
@@ -111,8 +111,8 @@ fig_homa2b = out1 %>%
 fig_bmi = out2 %>%
   as.data.frame() %>% 
   
-  mutate(cluster = factor(group,levels=c("NOT2D","SIDD","SIRD","MOD","MARD"),
-                          labels=c("No T2D","SIDD","SIRD","MOD","MARD"))) %>% 
+  mutate(cluster = factor(group,levels=c("NOT2D","MOD","SIRD","SIDD","MARD"),
+                          labels=c("No T2D","MOD","SIRD","SIDD","MARD"))) %>% 
   ggplot(data=.,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high,col=cluster)) +
   geom_path() +
   geom_ribbon(fill=NA,linetype = 2) +
@@ -124,8 +124,8 @@ fig_bmi = out2 %>%
 fig_hba1c = out3 %>%
   as.data.frame() %>% 
   
-  mutate(cluster = factor(group,levels=c("NOT2D","SIDD","SIRD","MOD","MARD"),
-                          labels=c("No T2D","SIDD","SIRD","MOD","MARD"))) %>% 
+  mutate(cluster = factor(group,levels=c("NOT2D","MOD","SIRD","SIDD","MARD"),
+                          labels=c("No T2D","MOD","SIRD","SIDD","MARD"))) %>% 
   ggplot(data=.,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high,col=cluster)) +
   geom_path() +
   geom_ribbon(fill=NA,linetype = 2) +
@@ -136,8 +136,8 @@ fig_hba1c = out3 %>%
 
 fig_homa2ir = out4 %>% 
   as.data.frame() %>% 
-  mutate(cluster = factor(group,levels=c("NOT2D","SIDD","SIRD","MOD","MARD"),
-                          labels=c("No T2D","SIDD","SIRD","MOD","MARD"))) %>% 
+  mutate(cluster = factor(group,levels=c("NOT2D","MOD","SIRD","SIDD","MARD"),
+                          labels=c("No T2D","MOD","SIRD","SIDD","MARD"))) %>% 
   ggplot(data=.,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high,col=cluster)) +
   geom_path() +
   geom_ribbon(fill=NA,linetype = 2) +
