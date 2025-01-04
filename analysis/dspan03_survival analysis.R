@@ -36,31 +36,33 @@ for (i in 1:length(ipcw_dfs)) {
                             TRUE ~ 0),
            sird = case_when(cluster == "SIRD" ~ 1,
                             TRUE ~ 0))
-  
+
   # Cox PH - baseline data
   cross_df <- cluster_df %>% 
     group_by(study_id,study) %>% 
     dplyr::filter(age == min(age)) %>% 
     ungroup() %>% 
-    mutate(across(c(bmi, hba1c, homa2b, homa2ir, ldlc, sbp, egfr_ckdepi_2021), ~replace(., is.infinite(.), NA)))
+    mutate(across(c(bmi, hba1c, homa2b, homa2ir, ldlc, sbp, egfr_ckdepi_2021), ~replace(., is.infinite(.), NA))) %>% 
+    mutate(race = case_when(race == "NH Other" ~ "Other", 
+                            TRUE ~ race))
   
-  overall_cp[[i]] <- coxph(Surv(time_to_event, event) ~ study + race + female + age + bmi + hba1c + homa2b + homa2ir 
+  overall_cp[[i]] <- coxph(Surv(time_to_event, event) ~ strata(study) + race + female + age + bmi + hba1c + homa2b + homa2ir 
                            + ldlc + sbp + egfr_ckdepi_2021, 
                            data = cross_df, weights = ipcw_cluster)
   
-  mard_cp[[i]] <- coxph(Surv(time_to_event, mard) ~ study + race + female + age + bmi + hba1c + homa2b + homa2ir 
+  mard_cp[[i]] <- coxph(Surv(time_to_event, mard) ~ strata(study) + race + female + age + bmi + hba1c + homa2b + homa2ir 
                         + ldlc + sbp + egfr_ckdepi_2021, 
                         data = cross_df, weights = ipcw_cluster)
   
-  mod_cp[[i]] <- coxph(Surv(time_to_event, mod) ~ study + race + female + age + bmi + hba1c + homa2b + homa2ir 
+  mod_cp[[i]] <- coxph(Surv(time_to_event, mod) ~ strata(study) + race + female + age + bmi + hba1c + homa2b + homa2ir 
                        + ldlc + sbp + egfr_ckdepi_2021, 
                        data = cross_df, weights = ipcw_cluster)
   
-  sidd_cp[[i]] <- coxph(Surv(time_to_event, sidd) ~ study + race + female + age + bmi + hba1c + homa2b + homa2ir 
+  sidd_cp[[i]] <- coxph(Surv(time_to_event, sidd) ~ strata(study) + race + female + age + bmi + hba1c + homa2b + homa2ir 
                         + ldlc + sbp + egfr_ckdepi_2021, 
                         data = cross_df, weights = ipcw_cluster)
   
-  sird_cp[[i]] <- coxph(Surv(time_to_event, sird) ~ study + race + female + age + bmi + hba1c + homa2b + homa2ir 
+  sird_cp[[i]] <- coxph(Surv(time_to_event, sird) ~ strata(study) + race + female + age + bmi + hba1c + homa2b + homa2ir 
                         + ldlc + sbp + egfr_ckdepi_2021, 
                         data = cross_df, weights = ipcw_cluster)
   
@@ -146,30 +148,28 @@ for (i in 1:length(ipcw_dfs)) {
     ungroup() %>% 
     # dplyr::filter(tstart < tstop)
     dplyr::filter((tstart < tstop) & (tstop <= censored_age)) %>% 
-    mutate(across(c(bmi, hba1c, homa2b, homa2ir, ldlc, sbp, egfr_ckdepi_2021), ~replace(., is.infinite(.), NA)))
-
-  # error due to 0 ppl in NH Other (sidd == 1), ignore this category
-  sidd_df <- tdcm_df %>%
+    mutate(across(c(bmi, hba1c, homa2b, homa2ir, ldlc, sbp, egfr_ckdepi_2021), ~replace(., is.infinite(.), NA))) %>% 
+    # error due to 0 ppl in NH Other (sidd == 1), ignore this category
     mutate(race = case_when(race == "NH Other" ~ "Other", 
                             TRUE ~ race))
-  
-  overall_tdcm[[i]] <- coxph(Surv(tstart, tstop, event) ~ study + female + race + min_age + bmi + hba1c + homa2b 
+
+  overall_tdcm[[i]] <- coxph(Surv(tstart, tstop, event) ~ strata(study) + female + race + min_age + bmi + hba1c + homa2b 
                              + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
                              data = tdcm_df, weights = ipcw_cluster)
   
-  mard_tdcm[[i]] <- coxph(Surv(tstart, tstop, mard) ~ study + female + race + min_age + bmi + hba1c + homa2b 
+  mard_tdcm[[i]] <- coxph(Surv(tstart, tstop, mard) ~ strata(study) + female + race + min_age + bmi + hba1c + homa2b 
                           + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
                           data = tdcm_df, weights = ipcw_cluster)
   
-  mod_tdcm[[i]] <- coxph(Surv(tstart, tstop, mod) ~ study + female + race + min_age + bmi + hba1c + homa2b 
+  mod_tdcm[[i]] <- coxph(Surv(tstart, tstop, mod) ~ strata(study) + female + race + min_age + bmi + hba1c + homa2b 
                          + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
                          data = tdcm_df, weights = ipcw_cluster)
   
-  sidd_tdcm[[i]] <- coxph(Surv(tstart, tstop, sidd) ~ study + female + race + min_age + bmi + hba1c + homa2b 
+  sidd_tdcm[[i]] <- coxph(Surv(tstart, tstop, sidd) ~ strata(study) + female + race + min_age + bmi + hba1c + homa2b 
                           + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
-                          data = sidd_df, weights = ipcw_cluster)
+                          data = tdcm_df, weights = ipcw_cluster)
   
-  sird_tdcm[[i]] <- coxph(Surv(tstart, tstop, sird) ~ study + female + race + min_age + bmi + hba1c + homa2b 
+  sird_tdcm[[i]] <- coxph(Surv(tstart, tstop, sird) ~ strata(study) + female + race + min_age + bmi + hba1c + homa2b 
                           + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
                           data = tdcm_df, weights = ipcw_cluster)
   
@@ -207,14 +207,15 @@ for (i in 1:length(ipcw_dfs)) {
     left_join(na.omit(df3[[i]]), by = "term") %>% 
     left_join(na.omit(df4[[i]]), by = "term") %>% 
     mutate(model = paste0("m", i))
-
+  
 }
 
 tdcm_output_results <- bind_rows(tdcmfinal_output) %>% 
   write_csv(.,"analysis/dspan03_tdcm with multiple imputation.csv")
 
 #--------------------------------------------------------------------------------------------------------------------
-# mixed effect model
+# mixed effect Cox model
+library(coxme)
 
 overall_mix <- list()
 mard_mix <- list()
@@ -243,28 +244,30 @@ for (i in 1:length(ipcw_dfs)) {
            sird = case_when(cluster == "SIRD" ~ 1,
                             TRUE ~ 0)) %>% 
     mutate(time_qua = time_to_event^2,
-           time_cub = time_to_event^3)
+           time_cub = time_to_event^3) %>% 
+    mutate(race = case_when(race == "NH Other" ~ "Other", 
+                            TRUE ~ race))
   
   
-  overall_mix[[i]] <- glm(event ~ study + age + female + race + bmi + hba1c + homa2b 
-                             + homa2ir + ldlc + sbp + egfr_ckdepi_2021,
-                             data = cluster_df, weights = ipcw_cluster, family = binomial(link = "logit"))
+  overall_mix[[i]] <- coxme(Surv(time_to_event, event) ~ study + age + female + race + bmi + hba1c + homa2b 
+                            + homa2ir + ldlc + sbp + egfr_ckdepi_2021 + (1|joint_id),
+                            data = cluster_df, weights = ipcw_cluster)
   
-  mard_mix[[i]] <- glm(mard ~ study + age + female + race + bmi + hba1c + homa2b 
-                         + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
-                         data = cluster_df, weights = ipcw_cluster, family = binomial(link = "logit"))
+  mard_mix[[i]] <- coxme(Surv(time_to_event, event) ~ study + age + female + race + bmi + hba1c + homa2b 
+                         + homa2ir + ldlc + sbp + egfr_ckdepi_2021 + (1|joint_id),
+                         data = cluster_df, weights = ipcw_cluster)
   
-  mod_mix[[i]] <- glm(mod ~ study + age + female + race + bmi + hba1c + homa2b 
-                        + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
-                        data = cluster_df, weights = ipcw_cluster, family = binomial(link = "logit"))
+  mod_mix[[i]] <- coxme(Surv(time_to_event, event) ~ study + age + female + race + bmi + hba1c + homa2b 
+                        + homa2ir + ldlc + sbp + egfr_ckdepi_2021 + (1|joint_id),
+                        data = cluster_df, weights = ipcw_cluster)
   
-  sidd_mix[[i]] <- glm(sidd ~ study + age + female + race + bmi + hba1c + homa2b 
-                         + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
-                         data = cluster_df, weights = ipcw_cluster, family = binomial(link = "logit"))
+  sidd_mix[[i]] <- coxme(Surv(time_to_event, event) ~ study + age + female + race + bmi + hba1c + homa2b 
+                         + homa2ir + ldlc + sbp + egfr_ckdepi_2021 + (1|joint_id),
+                         data = cluster_df, weights = ipcw_cluster)
   
-  sird_mix[[i]] <- glm(sird ~ study + age + female + race + bmi + hba1c + homa2b 
-                         + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
-                         data = cluster_df, weights = ipcw_cluster, family = binomial(link = "logit"))
+  sird_mix[[i]] <- coxme(Surv(time_to_event, event) ~ study + age + female + race + bmi + hba1c + homa2b 
+                         + homa2ir + ldlc + sbp + egfr_ckdepi_2021 + (1|joint_id),
+                         data = cluster_df, weights = ipcw_cluster)
   
   
   mix_results[[i]] <- bind_rows(
@@ -305,7 +308,7 @@ for (i in 1:length(ipcw_dfs)) {
 
 
 mix_output_results <- bind_rows(mixfinal_output) %>% 
-  write_csv(.,"analysis/dspan03_mixed model with multiple imputation.csv")
+  write_csv(.,"analysis/dspan03_mixed cox model with multiple imputation.csv")
 
 
 
