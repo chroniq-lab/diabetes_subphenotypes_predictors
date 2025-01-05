@@ -107,56 +107,60 @@ bind_rows(out1 %>% as.data.frame() %>%  mutate(outcome = "HOMA2B"),
           ) %>% 
   write_csv(.,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan04_modeled trajectories of biomarkers.csv"))
 
-cluster_not2d_colors = c(cluster_colors,"#AC94F4")
-names(cluster_not2d_colors) = c(names(cluster_colors),"No T2D")
 
-fig_homa2b = out1 %>% 
-  as.data.frame() %>% 
+out_combined <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan04_modeled trajectories of biomarkers.csv"))
+
+# cluster_not2d_colors = c(cluster_colors,"#AC94F4")
+cluster_not2d_colors = c(cluster_colors_cosmos,"#5C4033")
+names(cluster_not2d_colors) = c(names(cluster_colors_cosmos),"No T2D")
+
+fig_homa2b = out_combined %>%
+  dplyr::filter(outcome == "HOMA2B") %>% 
   mutate(cluster = factor(group,levels=c("NOT2D","MOD","SIRD","SIDD","MARD"),
                           labels=c("No T2D","MOD","SIRD","SIDD","MARD"))) %>% 
   ggplot(data=.,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high,col=cluster)) +
   geom_path() +
-  geom_ribbon(fill=NA,linetype = 2) +
+  geom_ribbon(fill=NA,linetype = "dotted") +
   theme_bw() + 
   xlab("Time (years)") +
   ylab("HOMA2-%B") +
   scale_color_manual(name="",values=cluster_not2d_colors)
 
+fig_homa2b
 
-
-fig_bmi = out2 %>%
-  as.data.frame() %>% 
+fig_bmi = out_combined %>%
+  dplyr::filter(outcome == "BMI") %>% 
   
   mutate(cluster = factor(group,levels=c("NOT2D","MOD","SIRD","SIDD","MARD"),
                           labels=c("No T2D","MOD","SIRD","SIDD","MARD"))) %>% 
   ggplot(data=.,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high,col=cluster)) +
   geom_path() +
-  geom_ribbon(fill=NA,linetype = 2) +
+  geom_ribbon(fill=NA,linetype = "dotted") +
   theme_bw() + 
   xlab("Time (years)") +
   ylab("BMI (kg/m2)") +
   scale_color_manual(name="",values=cluster_not2d_colors)
 
-fig_hba1c = out3 %>%
-  as.data.frame() %>% 
+fig_hba1c = out_combined %>%
+  dplyr::filter(outcome == "HbA1c") %>% 
   
   mutate(cluster = factor(group,levels=c("NOT2D","MOD","SIRD","SIDD","MARD"),
                           labels=c("No T2D","MOD","SIRD","SIDD","MARD"))) %>% 
   ggplot(data=.,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high,col=cluster)) +
   geom_path() +
-  geom_ribbon(fill=NA,linetype = 2) +
+  geom_ribbon(fill=NA,linetype = "dotted") +
   theme_bw() + 
   xlab("Time (years)") +
   ylab("HbA1c (%)") +
   scale_color_manual(name="",values=cluster_not2d_colors)
 
-fig_homa2ir = out4 %>% 
-  as.data.frame() %>% 
+fig_homa2ir = out_combined %>%
+  dplyr::filter(outcome == "HOMA2IR") %>% 
   mutate(cluster = factor(group,levels=c("NOT2D","MOD","SIRD","SIDD","MARD"),
                           labels=c("No T2D","MOD","SIRD","SIDD","MARD"))) %>% 
   ggplot(data=.,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high,col=cluster)) +
   geom_path() +
-  geom_ribbon(fill=NA,linetype = 2) +
+  geom_ribbon(fill=NA,linetype = "dotted") +
   theme_bw() + 
   xlab("Time (years)") +
   ylab("HOMA2-IR") +

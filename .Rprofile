@@ -11,6 +11,7 @@ if(Sys.info()["user"] == "JVARGH7"){
   path_diabetes_subphenotypes_adults_folder <- "C:/Cloud/Emory University/li, zhongyu - Diabetes Endotypes Project (JV and ZL)"
   cluster_labels = c("MOD","SIRD","MARD","SIDD")
   cluster_colors = c("MOD"="#F8BDA4","SIRD"="#A1C3AC","SIDD"="#ACD9EA","MARD"="#D0ACC9")
+  cluster_colors_cosmos = c("MOD"="#F8BDA4","SIRD"="darkgreen","SIDD"="#4682b4","MARD"="#D0ACC9")
   path_diabetes_subphenotypes_predictors_folder <- "C:/Cloud/OneDrive - Emory University/Papers/Predictors of Subphenotypes"
   
   path_prediabetes_subphenotypes_folder <- "C:/Cloud/OneDrive - Emory University/Papers/Subphenotypes of Prediabetes"
