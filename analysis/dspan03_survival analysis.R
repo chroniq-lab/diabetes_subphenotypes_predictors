@@ -115,16 +115,11 @@ mard_tdcm <- list()
 mod_tdcm <- list()
 sidd_tdcm <- list()
 sird_tdcm <- list()
-tdcm_results <- list()
-tdcm_output <- list()
-df0 <- list()
-df1 <- list()
-df2 <- list()
-df3 <- list()
-df4 <- list()
-tdcmfinal_output <- list()
 
-for (i in 1:length(ipcw_dfs)) {
+
+D = length(ipcw_dfs)
+
+for (i in 1:D) {
   df <- ipcw_dfs[[i]]  
   
   cluster_df <- df %>% 
@@ -148,7 +143,6 @@ for (i in 1:length(ipcw_dfs)) {
     ungroup() %>% 
     # dplyr::filter(tstart < tstop)
     dplyr::filter((tstart < tstop) & (tstop <= censored_age)) %>% 
-    mutate(across(c(bmi, hba1c, homa2b, homa2ir, ldlc, sbp, egfr_ckdepi_2021), ~replace(., is.infinite(.), NA))) %>% 
     # error due to 0 ppl in NH Other (sidd == 1), ignore this category
     mutate(race = case_when(race == "NH Other" ~ "Other", 
                             TRUE ~ race))
@@ -172,44 +166,18 @@ for (i in 1:length(ipcw_dfs)) {
   sird_tdcm[[i]] <- coxph(Surv(tstart, tstop, sird) ~ strata(study) + female + race + min_age + bmi + hba1c + homa2b 
                           + homa2ir + ldlc + sbp + egfr_ckdepi_2021, 
                           data = tdcm_df, weights = ipcw_cluster)
-  
-  
-  tdcm_results[[i]] <- bind_rows(
-    broom::tidy(overall_tdcm[[i]]) %>% mutate(model = "Overall"),
-    broom::tidy(mard_tdcm[[i]]) %>% mutate(model = "MARD"),
-    broom::tidy(mod_tdcm[[i]]) %>% mutate(model = "MOD"),
-    broom::tidy(sidd_tdcm[[i]]) %>% mutate(model = "SIDD"),
-    broom::tidy(sird_tdcm[[i]]) %>% mutate(model = "SIRD")) 
-  
-  # covert to Hazard Ratio
-  tdcm_output[[i]] <- tdcm_results[[i]] %>% 
-    mutate(HR = exp(estimate),
-           lci = exp(estimate - 1.96 * std.error),
-           uci = exp(estimate + 1.96 * std.error)) %>% 
-    mutate(coef_ci = paste0(round(HR, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
-    pivot_wider(names_from = model, values_from = coef_ci) %>% 
-    dplyr::select(term, Overall, MARD, MOD, SIDD, SIRD) 
-  
-  df0[[i]] <- tdcm_output[[i]] %>% 
-    dplyr::select(term, Overall)
-  df1[[i]] <- tdcm_output[[i]] %>% 
-    dplyr::select(term, MARD) 
-  df2[[i]] <- tdcm_output[[i]] %>% 
-    dplyr::select(term, MOD)
-  df3[[i]] <- tdcm_output[[i]] %>% 
-    dplyr::select(term, SIDD)
-  df4[[i]] <- tdcm_output[[i]] %>% 
-    dplyr::select(term, SIRD)
-  
-  tdcmfinal_output[[i]] <- na.omit(df0[[i]]) %>% 
-    left_join(na.omit(df1[[i]]), by = "term") %>% 
-    left_join(na.omit(df2[[i]]), by = "term") %>% 
-    left_join(na.omit(df3[[i]]), by = "term") %>% 
-    left_join(na.omit(df4[[i]]), by = "term") %>% 
-    mutate(model = paste0("m", i))
-  
 }
 
-tdcm_output_results <- bind_rows(tdcmfinal_output) %>% 
-  write_csv(.,"analysis/dspan03_tdcm with multiple imputation.csv")
+
+
+source("functions/pool_results.R")
+
+tdcm_results <- bind_rows(
+  pool_results(overall_tdcm) %>% mutate(model = "Overall"),
+  pool_results(mard_tdcm) %>% mutate(model = "MARD"),
+  pool_results(mod_tdcm) %>% mutate(model = "MOD"),
+  pool_results(sidd_tdcm) %>% mutate(model = "SIDD"),
+  pool_results(sird_tdcm) %>% mutate(model = "SIRD")) %>% 
+  write_csv(.,"analysis/dspan03_tdcm pooled results with multiple imputation.csv")
+
 
