@@ -34,6 +34,7 @@ pool_results <- function(model) {
     mutate(HR = paste0(round(exp(theta_D), 2), " \t (",
                        round(exp(L), 2), ", ",
                        round(exp(U), 2), ")"),
+           estimate = exp(theta_D),
            lci = exp(L),
            uci = exp(U)
     ) %>% 
