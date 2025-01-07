@@ -2,85 +2,30 @@ rm(list = ls());gc();source(".Rprofile")
 
 library(gridExtra)
 library(ggplot2)
-library(survminer)
+library(survival)
 
-tdcm_coef <- read_csv("analysis/dspan03_tdcm pooled results with multiple imputation.csv") %>% 
-  select(iv, estimate, lci, uci, model) %>% 
-  mutate(HR = paste0(round(estimate, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
-  dplyr::filter(!iv %in% c("studymesa","studyjhs","raceNH Black","raceNH White","raceOther","female1","min_age"),
-                model != "Overall") %>% 
-  mutate(term = case_when(
-    iv == "bmi" ~ "BMI",
-    iv == "sbp" ~ "SBP",
-    iv == "hba1c" ~ "HbA1c",
-    iv == "ldlc" ~ "LDL",
-    iv == "homa2b" ~ "HOMA2-%B",
-    iv == "homa2ir" ~ "HOMA2-IR",
-    iv == "egfr_ckdepi_2021" ~ "eGFR",
-    TRUE ~ iv  
-  ),
-  term = factor(term,
-                levels = c("eGFR", "HOMA2-IR", "HOMA2-%B", "LDL", "HbA1c", "SBP", "BMI"),
-                labels = c("eGFR", "HOMA2-IR", "HOMA2-%B", "LDL", "HbA1c", "SBP", "BMI"))
-  )
-
-
-# forest plot
-
-plot_forest <- ggplot(tdcm_coef, aes(y = term, x = estimate, xmin = lci, xmax = uci, color = model)) + 
-  geom_pointrange(position = position_dodge(width = 0.7), size = 0.7) +
-  geom_vline(xintercept = 1, linetype = "dashed", color = "darkgrey") +
-  geom_hline(yintercept = 0, linetype = "solid", color = "black") +
-  scale_color_manual(values = cluster_colors) +
-  scale_x_continuous(limits = c(0, 2.5)) +
-  labs(
-    x = "Hazard ratio (95% CI)",
-    y = NULL,
-    title = "A: Hazard Ratios by Pathophysiological Markers",
-    color = "Subtype"
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    legend.position = "none",
-    axis.text.y = element_text(size = 12),
-    axis.title.x = element_text(size = 12),
-    axis.text.x = element_text(size = 12),
-    panel.grid = element_blank(),
-    axis.line = element_line(color = "black", size = 0.4)
-  ) +
-  geom_text(
-    aes(x = uci + 0.05, label = HR),
-    position = position_dodge(width = 0.7),
-    vjust = 0.2,
-    hjust = -0.05,
-    fontface = "bold",
-    size = 4
-  ) 
-
-
-
-#-------------------------------------------------------------------------------------------------------------------
 # time-varying coefficients plot
-# Fer: https://pmc.ncbi.nlm.nih.gov/articles/PMC6015946/#sec2
+# Ref: https://pmc.ncbi.nlm.nih.gov/articles/PMC6015946/#sec2
+
 
 ipcw_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan02_ipcw dfs.RDS"))
 
 for (i in 1:length(ipcw_dfs)) {
-  df <- ipcw_dfs[[i]]
+  df <- ipcw_dfs[[1]]
   
   tdcm_df <- df %>%
     arrange(study, study_id, age) %>%
     group_by(study, study_id) %>%
     mutate(
-      tstart = case_when(row_number() == 1 ~ age, 
-                        TRUE ~ dplyr::lag(age, n = 1)), 
-      tstop = age
-      # baseline_age = first(age),  # Assuming 'age' at first observation is baseline
-      # tstart = case_when(
-      #   row_number() == 1 ~ 0, 
-      #   TRUE ~ age - first(age)
-      # ), 
-      # tstop = lead(tstart, default = last(age) - first(age)) 
+      # tstart = case_when(row_number() == 1 ~ age, 
+      #                   TRUE ~ dplyr::lag(age, n = 1)), 
+      # tstop = age
+      baseline_age = first(age),  # Assuming 'age' at first observation is baseline
+      tstart = case_when(
+        row_number() == 1 ~ 0, 
+        TRUE ~ age - first(age)
+      ), 
+      tstop = lead(tstart, default = last(age) - first(age)) 
     ) %>%
     ungroup() %>% 
     mutate(across(c(bmi, hba1c, homa2b, homa2ir, ldlc, sbp, egfr_ckdepi_2021), ~replace(., is.infinite(.), NA))) %>% 
@@ -93,31 +38,31 @@ for (i in 1:length(ipcw_dfs)) {
                             labels = c("MOD", "SIDD", "MARD", "SIRD"))
     ) 
   
-  
-  bmi_fit[[i]] <- coxph(Surv(tstart, tstop, event) ~ bmi + study + female + race + min_age, 
-                         data = tdcm_df, weights = ipcw_cluster)
-  
-  hba1c_fit[[i]] <- coxph(Surv(tstart, tstop, event) ~ hba1c + study + female + race + min_age, 
-                        data = tdcm_df, weights = ipcw_cluster)
-  
-  homa2b_fit[[i]] <- coxph(Surv(tstart, tstop, event) ~ homa2b + study + female + race + min_age, 
-                        data = tdcm_df, weights = ipcw_cluster)
-  
-  homa2ir_fit[[i]] <- coxph(Surv(tstart, tstop, event) ~ homa2ir + study + female + race + min_age, 
-                        data = tdcm_df, weights = ipcw_cluster)
-  
-  ldlc_fit[[i]] <- coxph(Surv(tstart, tstop, event) ~ ldlc + study + female + race + min_age, 
-                        data = tdcm_df, weights = ipcw_cluster)
-  
-  sbp_fit[[i]] <- coxph(Surv(tstart, tstop, event) ~ sbp + study + female + race + min_age, 
-                        data = tdcm_df, weights = ipcw_cluster)
-  
-  egfr_fit[[i]] <- coxph(Surv(tstart, tstop, event) ~ egfr_ckdepi_2021 + study + female + race + min_age, 
-                        data = tdcm_df, weights = ipcw_cluster)
-  
-  
-  
+
 }
+
+
+bmi_fit<- coxph(Surv(tstart, tstop, event) ~ bmi + study + female + race + min_age, 
+                      data = tdcm_df, weights = ipcw_cluster)
+
+hba1c_fit <- coxph(Surv(tstart, tstop, event) ~ hba1c + study + female + race + min_age, 
+                        data = tdcm_df, weights = ipcw_cluster)
+
+homa2b_fit <- coxph(Surv(tstart, tstop, event) ~ homa2b + study + female + race + min_age, 
+                         data = tdcm_df, weights = ipcw_cluster)
+
+homa2ir_fit <- coxph(Surv(tstart, tstop, event) ~ homa2ir + study + female + race + min_age, 
+                          data = tdcm_df, weights = ipcw_cluster)
+
+ldlc_fit <- coxph(Surv(tstart, tstop, event) ~ ldlc + study + female + race + min_age, 
+                       data = tdcm_df, weights = ipcw_cluster)
+
+sbp_fit <- coxph(Surv(tstart, tstop, event) ~ sbp + study + female + race + min_age, 
+                      data = tdcm_df, weights = ipcw_cluster)
+
+egfr_fit <- coxph(Surv(tstart, tstop, event) ~ egfr_ckdepi_2021 + study + female + race + min_age, 
+                       data = tdcm_df, weights = ipcw_cluster)
+
 
 zph_bmi <- cox.zph(bmi_fit)
 zph_hba1c <- cox.zph(hba1c_fit)
@@ -126,6 +71,7 @@ zph_homa2ir <- cox.zph(homa2ir_fit)
 zph_ldlc <- cox.zph(ldlc_fit)
 zph_sbp <- cox.zph(sbp_fit)
 zph_egfr <- cox.zph(egfr_fit)
+
 
 
 jpeg(paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/time-varying coefficients.jpg"), width = 1600, height = 800)
