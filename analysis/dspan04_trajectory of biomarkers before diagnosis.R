@@ -114,7 +114,7 @@ out_combined <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/
 cluster_not2d_colors = c(cluster_colors_cosmos,"#5C4033")
 names(cluster_not2d_colors) = c(names(cluster_colors_cosmos),"No T2D")
 
-fig_homa2b = out_combined %>%
+fig_homa2b = out_combined %>% 
   dplyr::filter(outcome == "HOMA2B") %>% 
   mutate(cluster = factor(group,levels=c("NOT2D","MOD","SIRD","SIDD","MARD"),
                           labels=c("No T2D","MOD","SIRD","SIDD","MARD"))) %>% 

@@ -1,8 +1,8 @@
 rm(list = ls());gc();source(".Rprofile")
 # ,"hc","triceps","iliac","abdominal","medial" --> not there in mesa
-anthro_vars <- c("sbp","dbp","height","wc","bmi")
+anthro_vars <- c("sbp","dbp","height","weight","wc","bmi")
 # "glucose2h","vldlc","ast","alt","apo_a","apo_b","uric_acid" --> not there in mesa
-lab_vars <- c("hba1c","insulinf2","glucosef2","tgl","hdlc","ldlc",
+lab_vars <- c("hba1c","insulinf2","glucosef2","tgl","hdlc","ldlc","totalc",
               "serumcreatinine","urinealbumin","urinecreatinine","uacr","egfr")
 
 mesa_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/mesa_newdm.RDS")) 
@@ -39,7 +39,9 @@ mesa_longitudinal = mesa_dat_all %>%
   mutate(
     available_labs = rowSums(!is.na(.[,lab_vars])),
     available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
-  dplyr::select(study_id,exam,age,dmagediag,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars),female,race,ethnicity)
+  dplyr::select(study_id,exam,age,dmagediag,female,race,ethnicity,dmfamilyhistory,
+                ratio_th,smk_cig,smk_pipe,smk_tob,
+                available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars))
 
 
 

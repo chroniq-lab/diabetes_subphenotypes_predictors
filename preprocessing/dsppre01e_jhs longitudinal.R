@@ -1,9 +1,9 @@
 rm(list = ls());gc();source(".Rprofile")
 #  ,"hc","triceps","iliac","abdominal","medial"--> not there in jhs
-anthro_vars <- c("sbp","dbp","height","wc","bmi")
+anthro_vars <- c("sbp","dbp","height","weight","wc","bmi")
 # "glucose2h","apo_a","apo_b","vldlc","ast","alt","uric_acid" --> not there in jhs
-lab_vars <- c("hba1c","insulinf","glucosef","tgl","hdlc","ldlc",
-              "serumcreatinine","urinecreatinine","egfr")
+lab_vars <- c("hba1c","insulinf","glucosef","tgl","hdlc","ldlc","totalc",
+              "serumcreatinine","urinecreatinine","urinealbumin","egfr")
 
 
 jhs_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/jhs_newdm.RDS")) 
@@ -31,7 +31,9 @@ jhs_longitudinal = jhs_analysis %>%
   mutate(
     available_labs = rowSums(!is.na(.[,lab_vars])),
     available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
-  dplyr::select(study_id,visit,age,dmagediag,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars),female,race_eth)
+  dplyr::select(study_id,visit,age,dmagediag,female,race_eth,
+                alcohol,smoking,
+                available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars))
 
 
 

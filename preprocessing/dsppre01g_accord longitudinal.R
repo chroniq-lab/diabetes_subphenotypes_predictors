@@ -1,11 +1,29 @@
 rm(list = ls());gc();source(".Rprofile")
-# ,"hc","triceps","iliac","abdominal","medial" --> not there in aric
-anthro_vars <- c("sbp","dbp","height","wc","bmi")
-# "vldlc","ast","alt" --> not there in aric
-lab_vars <- c("hba1c","insulinf","glucosef","glucose2h","tgl","hdlc","ldlc",
-              "serumcreatinine","urinecreatinine","egfr","apo_a","apo_b","uric_acid")
-
-accord_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/accord_newdm.RDS")) 
+# ,"hc","triceps","iliac","abdominal","medial" --> not there in accord
+anthro_vars <- c("sbp","dbp","height","weight","wc")
+# "glucose2h","insulinf","ast","apo_a","apo_b","uric_acid" --> not there in accord
+lab_vars <- c("hba1c","glucosef","tgl","hdlc","ldlc","totalc","vldlc","alt",
+              "serumcreatinine","urinealbumin","urinecreatinine","uacr","egfr")
 
 
-accord = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/accord.RDS")) 
+# no fasting insulin; fasting glucose in mg/gl 
+accord_dat_all <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/accord_dat_all.RDS")) %>% 
+  arrange(study_id,visit) %>% 
+  dplyr::mutate(ratio_th=tgl/hdlc
+                ) %>% 
+  dplyr::filter(!is.na(bsage))
+
+accord_longitudinal = accord_dat_all %>% 
+  arrange(study_id,visit) %>% 
+  mutate(
+    available_labs = rowSums(!is.na(.[,lab_vars])),
+    available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
+  dplyr::select(study_id,visit,bsage,dmagediag,dmduration,available_labs,available_anthro,
+                one_of(anthro_vars),one_of(lab_vars),female,race_eth,alcohol,smoking)
+
+
+
+saveRDS(accord_longitudinal,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01g_accord.RDS"))
+
+accord_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01g_accord.RDS"))
+write_csv(accord_longitudinal,paste0(path_prediabetes_subphenotypes_folder,"/working/longitudinal/accord.csv"))

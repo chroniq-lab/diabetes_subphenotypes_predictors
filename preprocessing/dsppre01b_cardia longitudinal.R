@@ -1,10 +1,10 @@
 rm(list = ls());gc();source(".Rprofile")
 # "hc","triceps","iliac","abdominal","medial" --> not there in cardia
-anthro_vars <- c("sbp","dbp","height","wc","bmi")
+anthro_vars <- c("sbp","dbp","height","weight","wc","bmi")
 #  --> not there in aric
 # ,"ast","alt","uric_acid" --> not there in cardia
-lab_vars <- c("hba1c","insulinf","glucosef","glucose2h","tgl","hdlc","ldlc",
-              "serumcreatinine","urinecreatinine","egfr","apo_a","apo_b","vldlc")
+lab_vars <- c("hba1c","insulinf","glucosef","glucose2h","tgl","hdlc","ldlc","totalc","vldlc",
+              "serumcreatinine","urinecreatinine","urinealbumin","egfr","uacr","apo_a","apo_b")
 
 cardia_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/cardia_newdm.RDS")) 
 cardia_baselinedm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/cardia_baseline_dm.RDS")) 
@@ -49,7 +49,9 @@ cardia_longitudinal = cardia_dat_all %>%
   mutate(
     available_labs = rowSums(!is.na(.[,lab_vars])),
     available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
-  dplyr::select(study_id,year,age,female,race_rev,race,dmagediag,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars))
+  dplyr::select(study_id,year,age,female,race_rev,race,dmagediag,
+                alcoh_py,drink_stop,drinks_num,drinker,cigr_st,smk_st,ratio_th,
+                available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars))
 
 
 saveRDS(cardia_longitudinal,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01b_cardia.RDS"))
