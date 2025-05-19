@@ -24,7 +24,7 @@ source("functions/egfr_ckdepi_2021.R")
 final_dataset_temp = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/final_dataset_temp.RDS")) %>%
   mutate(joint_id = paste(study, original_study_id, sep = "_"))
 
-analytic_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dsppre01_analytic df.RDS")) %>% 
+analytic_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/ada abstract/dsppre01_analytic df.RDS")) %>% 
   mutate(egfr_ckdepi_2021 = egfr_ckdepi_2021(scr = serumcreatinine,female = female,age = age),
          joint_id = paste(study, study_id, sep = "_"),
          # newly diagnosed T2D or no T2D

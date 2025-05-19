@@ -6,17 +6,23 @@ library(writexl)
 
 # new dm + no dm
 final_dataset_temp = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/final_dataset_temp.RDS"))
-aric_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01a_aric.RDS")) %>% 
+aric_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/ada abstract/dsppre01a_aric.RDS")) %>% 
   mutate(study = "aric")
-cardia_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01b_cardia.RDS")) %>% 
-  mutate(study = "cardia")
-jhs_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01e_jhs.RDS")) %>% 
+cardia_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/ada abstract/dsppre01b_cardia.RDS")) %>% 
+  mutate(study = "cardia") %>% 
+  mutate(race = case_when(race == 4 ~ "NH Black",
+                          race == 5 ~ "NH White",
+                          TRUE ~ NA_character_),
+         female = female - 1)
+jhs_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/ada abstract/dsppre01e_jhs.RDS")) %>% 
   mutate(study = "jhs",
-         race = race_eth)
+         race = "NH Black")
+
+# Use new dataset
 dppos_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dppos.RDS")) %>% 
   mutate(study = "dppos",
          race = race_eth)
-mesa_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01f_mesa.RDS")) %>% 
+mesa_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/ada abstract/dsppre01f_mesa.RDS")) %>% 
   mutate(study = "mesa")
 
 clusters = read_csv(paste0(path_diabetes_subphenotypes_adults_folder,"/working/processed/dec_an02_clean_kmeans_5var_mi_knn_cluster.csv")) %>% 
@@ -30,7 +36,9 @@ clusters = read_csv(paste0(path_diabetes_subphenotypes_adults_folder,"/working/p
 longitudinal_df = bind_rows(aric_longitudinal %>% mutate(study_id = as.numeric(str_replace(study_id,"C",""))),
                             cardia_longitudinal,
                             jhs_longitudinal,
-                            dppos_longitudinal %>% mutate(female = sex - 1),
+                            # dppos_longitudinal %>% mutate(female = sex - 1),
+                            # New version already has female
+                            dppos_longitudinal,
                             mesa_longitudinal) %>%
   
   bind_rows(final_dataset_temp %>% dplyr::select(-study_id) %>% 
@@ -62,7 +70,7 @@ longitudinal_df = bind_rows(aric_longitudinal %>% mutate(study_id = as.numeric(s
   mutate(study = case_when(study == "dpp" ~ "dppos",
                            TRUE ~ study))
 
-saveRDS(longitudinal_df,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dsppre01_longitudinal df.RDS"))
+saveRDS(longitudinal_df,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/ada abstract/dsppre01_longitudinal df.RDS"))
 
 #--------------------------------------------------------------------------------------------------------------------
 # one cohort one sheet; keep study_id, study, age
@@ -90,12 +98,13 @@ list_of_dataframes <- lapply(study_names, function(name) {
 names(list_of_dataframes) <- study_names
 
 
-excel_path <- paste0(path_diabetes_subphenotypes_predictors_folder, "/working/cleaned/homa2 calculation/homa2 indices calculation df.xlsx")
+excel_path <- paste0(path_diabetes_subphenotypes_predictors_folder, "/working/cleaned/ada abstract/homa2 indices calculation df.xlsx")
 write_xlsx(list_of_dataframes, excel_path)
 
 #--------------------------------------------------------------------------------------------------------------------
 # add homa2 in the dataset by study_id, study, age
-path_to_file <- paste0(path_diabetes_subphenotypes_predictors_folder, "/working/cleaned/homa2 calculation/homa2 indices values.xlsx")
+
+path_to_file <- paste0(path_diabetes_subphenotypes_predictors_folder, "/working/cleaned/ada abstract/homa2 indices values.xlsx") # -> COMMENTED FROM PREVIOUS VERSION
 sheets <- c("aric", "cardia", "jhs", "dppos", "mesa")
 list_of_data <- lapply(sheets, function(sheet) readxl::read_excel(path_to_file, sheet = sheet))
 
@@ -113,6 +122,6 @@ analytic_df <- longitudinal_df %>%
               dplyr::select(cluster_study_id,original_study_id,cluster,study,female),
             by=c("study"="study","study_id" = "original_study_id","female"))
 
-saveRDS(analytic_df,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dsppre01_analytic df.RDS"))
+saveRDS(analytic_df,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/ada abstract/dsppre01_analytic df.RDS"))
 
-write.csv(analytic_df, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dsppre01_analytic df.csv"))
+write.csv(analytic_df, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/ada abstract/dsppre01_analytic df.csv"))
