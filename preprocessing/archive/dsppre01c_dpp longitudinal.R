@@ -6,7 +6,7 @@ anthro_vars <- c("sbp","dbp","height","wc","hc","triceps","iliac","abdominal","m
 lab_vars <- c("hba1c","insulinf","glucosef","glucose2h","vldlc","tgl","hdlc","ldlc",
               "serumcreatinine","ast","alt")
 
-dpp_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/processed/final_dataset_temp.RDS")) %>% 
+dpp_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/final_dataset_temp.RDS")) %>% 
   dplyr::filter(study == "dpp") %>% 
   mutate(original_study_id = as.numeric(original_study_id))  %>% 
   mutate(dmagediag = round(dmagediag,2))

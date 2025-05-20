@@ -22,19 +22,28 @@ clusters = read_csv(paste0(path_diabetes_subphenotypes_adults_folder,"/working/p
             by=c("study_id")) %>% 
   rename(cluster_study_id = study_id)
 
+common_vars <- intersect(names(final_dataset_temp), names(pooled_df))
 
 analytic_df <- pooled_df %>% 
+  bind_rows(final_dataset_temp %>% dplyr::select(-study_id) %>% 
+              rename(study_id = original_study_id) %>% 
+              mutate(age = case_when(is.na(age) ~ dmagediag,
+                                     TRUE ~ age)) %>% 
+              dplyr::select(all_of(common_vars))
+            ) %>% 
   left_join(homa2_combined %>% 
               rename(homa2b = `HOMA2 %B`,
                      homa2ir = `HOMA2 IR`) %>% 
               dplyr::select(-c(`HOMA2 %S`,glucosef2,insulinf2)) %>% 
               distinct(study_id,study,age,.keep_all=TRUE),
             by = c("study_id","study","age")) %>% 
+  
   left_join(clusters %>% 
               dplyr::select(cluster_study_id,original_study_id,cluster,study,female) %>% 
               mutate(study = case_when(study == "dpp" ~ "dppos",
                                        TRUE ~ study)),
             by=c("study"="study","study_id" = "original_study_id","female")) %>% 
+  
   # exclude outliers
   mutate(
     weight = case_when(weight <= 150 ~ weight,

@@ -41,7 +41,6 @@ analytic_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/wo
 
 wave_df <- analytic_df %>% 
   group_by(study,study_id,joint_id) %>%
-  # problem in the filter conditions
   mutate(has_age_before_max = any(age < max_age)) %>% 
   dplyr::filter((newdm_event == 1 & has_age_before_max & !is.na(cluster)) 
                 | (newdm_event == 0 & has_age_before_max)) %>% 
@@ -52,9 +51,8 @@ wave_df <- analytic_df %>%
   arrange(joint_id,t) %>% 
   distinct(joint_id,t,.keep_all=TRUE) %>% 
   mutate(across(one_of(c("subtype","race","study")),.fns=~as.factor(.)))
-
-### fix race (high % of missing values)
-summary(wave_df[,c("homa2b","t","subtype","max_age","female","study","race")])
+  
+summary(wave_df[,c("homa2b","t","subtype","max_age","female","study","race_clean")])
 table(wave_df$subtype,useNA="always")
 
 wave_df %>% 
@@ -86,10 +84,10 @@ emm_options(pbkrtest.limit = 999999)
  
 
 library(lme4)
-m1 = lmer(log(homa2b) ~ subtype*ns(t, df = 3) + max_age + female + study + race + (1|joint_id), data = wave_df)
-m2 = lmer(bmi ~ subtype*ns(t,df = 3) + max_age + female + study + race  + (1|joint_id), data = wave_df)
-m3 = lmer(hba1c ~ subtype*ns(t,df = 3) + max_age + female + study + race  + (1|joint_id), data = wave_df)
-m4 = lmer(log(homa2ir) ~ subtype*ns(t,df = 3) + max_age + female + study + race  + (1|joint_id), data = wave_df)
+m1 = lmer(log(homa2b) ~ subtype*ns(t, df = 3) + max_age + female + study + race_clean + (1|joint_id), data = wave_df)
+m2 = lmer(bmi ~ subtype*ns(t,df = 3) + max_age + female + study + race_clean  + (1|joint_id), data = wave_df)
+m3 = lmer(hba1c ~ subtype*ns(t,df = 3) + max_age + female + study + race_clean  + (1|joint_id), data = wave_df)
+m4 = lmer(log(homa2ir) ~ subtype*ns(t,df = 3) + max_age + female + study + race_clean  + (1|joint_id), data = wave_df)
 
 
 

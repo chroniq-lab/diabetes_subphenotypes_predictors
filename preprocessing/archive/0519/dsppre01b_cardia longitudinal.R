@@ -173,7 +173,8 @@ cardia_selected = bind_rows(
     rename(diff_age = diff_next)
   
 ) %>% 
-  dplyr::select(type,study_id,diff_age,age,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars)) %>% 
+  dplyr::select(type,study_id,diff_age,age,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars),
+                race,female,dmagediag) %>% 
   arrange(type,study_id,age)
 
 saveRDS(cardia_selected,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01b_cardia.RDS"))

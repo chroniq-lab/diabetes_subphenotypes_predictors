@@ -74,9 +74,9 @@ for (i in 1:length(ipcw_dfs)) {
                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
                           data = tdcm_df, weights = ipcw_cluster)
   
-  not2d_tdcm[[i]] <- coxph(Surv(tstart, tstop, not2d) ~ study + female + race_clean + min_age + bmi + hba1c + homa2b 
-                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
-                          data = tdcm_df, weights = ipcw_cluster)
+  # not2d_tdcm[[i]] <- coxph(Surv(tstart, tstop, not2d) ~ study + female + race_clean + min_age + bmi + hba1c + homa2b 
+  #                         + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
+  #                         data = tdcm_df, weights = ipcw_cluster)
 }
 
 
@@ -88,8 +88,59 @@ tdcm_results <- bind_rows(
   pool_results(mard_tdcm) %>% mutate(model = "MARD"),
   pool_results(mod_tdcm) %>% mutate(model = "MOD"),
   pool_results(sidd_tdcm) %>% mutate(model = "SIDD"),
-  pool_results(sird_tdcm) %>% mutate(model = "SIRD"),
-  pool_results(not2d_tdcm) %>% mutate(model = "NOT2D")) %>% 
+  pool_results(sird_tdcm) %>% mutate(model = "SIRD")
+  # pool_results(not2d_tdcm) %>% mutate(model = "NOT2D")
+  ) %>% 
   write_csv(.,"analysis/dspan03_tdcm pooled results with multiple imputation.csv")
 
+
+# Ridge penalty -------------------------------------------------------------
+
+library(glmnet)
+
+# 1. Prepare the design matrix
+x <- model.matrix(Surv(tstart, tstop, sidd) ~ study + female + race_clean + min_age + bmi + 
+                    hba1c + homa2b + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled,
+                  data = tdcm_df)[, -1]  # Remove intercept
+
+# 2. Create survival object
+y <- with(tdcm_df, Surv(tstart, tstop, sidd))
+
+# 3. Fit ridge-penalized Cox model
+ridge_fit <- cv.glmnet(
+  x, y,
+  family = "cox",
+  alpha = 0,             # alpha = 0 → Ridge penalty
+  weights = tdcm_df$ipcw_cluster,  # Optional: include IPCW weights if applicable
+  nfolds = 5             # Cross-validation to choose lambda
+)
+
+# 4. View coefficients at optimal lambda
+coef(ridge_fit, s = "lambda.min")
+
+# predict(ridge_fit, newx = x, s = "lambda.min", type = "link")
+coef_ridge <- coef(ridge_fit, s = "lambda.min")
+hr <- exp(coef_ridge)
+
+
+library(boot)
+
+# Bootstrap function to refit ridge model and extract coefficients
+boot_fn <- function(data, indices) {
+  d <- data[indices, ]
+  x_boot <- model.matrix(Surv(tstart, tstop, sidd) ~ study + female + race_clean + min_age + bmi + 
+                           hba1c + homa2b + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled,
+                         data = d)[, -1]
+  y_boot <- with(d, Surv(tstart, tstop, sidd))
+  fit <- glmnet(x_boot, y_boot, family = "cox", alpha = 0)
+  coef(fit, s = ridge_fit$lambda.min)
+}
+
+# Run bootstrap
+set.seed(123)
+boot_results <- boot(data = tdcm_df, statistic = boot_fn, R = 100)
+
+# Compute 95% CI for each coefficient
+ci_boot <- apply(boot_results$t, 2, function(x) quantile(x, probs = c(0.025, 0.975)))
+hr_ci <- exp(ci_boot)  # HR CI
 

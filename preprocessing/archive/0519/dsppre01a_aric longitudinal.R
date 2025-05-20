@@ -171,7 +171,8 @@ aric_longitudinal = aric_analysis %>%
             by=c("study_id")) %>% 
   mutate(
          available_labs = rowSums(!is.na(.[,lab_vars])),
-         available_anthro = rowSums(!is.na(.[,anthro_vars])))
+         available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
+  mutate(study_id = as.numeric(gsub("[^0-9]", "", study_id)))
 
 # Before dmagediag
 before_dmagediag = join_by(study_id == original_study_id,
@@ -214,7 +215,8 @@ aric_selected = bind_rows(
     rename(diff_age = diff_next)
   
 ) %>% 
-  dplyr::select(type,study_id,diff_age,age,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars)) %>% 
+  dplyr::select(type,study_id,diff_age,age,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars),
+                race,race_rev,female,dmagediag) %>% 
   arrange(type,study_id,age)
 
 saveRDS(aric_selected,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01a_aric.RDS"))

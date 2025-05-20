@@ -2,11 +2,19 @@ rm(list = ls());gc();source(".Rprofile")
 
 library(gridExtra)
 library(ggplot2)
+library(ggsurvfit)
 library(survminer)
+library(survival)
 
 tdcm_coef <- read_csv("analysis/dspan03_tdcm pooled results with multiple imputation.csv") %>% 
   select(iv, estimate, lci, uci, model) %>% 
-  # mutate(HR = paste0(round(estimate, 2), " (", round(lci, 2), ", ", round(uci, 2), ")")) %>% 
+  mutate(estimate = case_when(model == "NOT2D" ~ 1,
+                              TRUE ~ estimate),
+         lci = case_when(model == "NOT2D" ~ 1,
+                              TRUE ~ lci),
+         uci = case_when(model == "NOT2D" ~ 1,
+                         TRUE ~ uci)
+         ) %>% 
   mutate(HR = paste0(format(round(estimate, 2), nsmall = 2), " (",
                         format(round(lci, 2), nsmall = 2), ", ",
                         format(round(uci, 2), nsmall = 2), ")")) %>% 
@@ -14,19 +22,27 @@ tdcm_coef <- read_csv("analysis/dspan03_tdcm pooled results with multiple imputa
                 model != "Overall") %>% 
   mutate(term = case_when(
     iv == "bmi" ~ "BMI",
-    iv == "sbp" ~ "SBP",
+    iv == "sbp_scaled" ~ "SBP",
     iv == "hba1c" ~ "HbA1c",
-    iv == "ldlc" ~ "LDL",
+    iv == "ldlc_scaled" ~ "LDL",
     iv == "homa2b" ~ "HOMA2-%B",
     iv == "homa2ir" ~ "HOMA2-IR",
-    iv == "egfr_ckdepi_2021" ~ "eGFR",
+    iv == "egfr_ckdepi_2021_scaled" ~ "eGFR",
     TRUE ~ iv  
   ),
   term = factor(term,
                 levels = c("eGFR", "HOMA2-IR", "HOMA2-%B", "LDL", "HbA1c", "SBP", "BMI"),
-                labels = c("eGFR", "HOMA2-IR", "HOMA2-%B", "LDL", "HbA1c", "SBP", "BMI"))
-  )
+                labels = c("eGFR (per 10 mL/min/1.73 m²)", "HOMA2-IR", "HOMA2-%B", "LDL (per 10 mg/dL)", "HbA1c (%)", "SBP (per 10 mmHg)", "BMI (kg/m²)"))
+  ) %>% 
+  mutate(model = case_when(model == "NOT2D" ~ "No T2D",
+                           TRUE ~ model),
+         model = factor(model,
+                        levels = c("MOD", "SIDD", "MARD", "SIRD", "No T2D"),
+                        labels = c("MOD", "SIDD", "MARD", "SIRD", "No T2D")))
 
+
+cluster_not2d_colors = c(cluster_colors_cosmos,"#5C4033")
+names(cluster_not2d_colors) = c(names(cluster_colors_cosmos),"No T2D")
 
 # forest plot
 
@@ -34,17 +50,17 @@ plot_forest <- ggplot(tdcm_coef, aes(y = term, x = estimate, xmin = lci, xmax = 
   geom_pointrange(position = position_dodge(width = 0.7), size = 0.7) +
   geom_vline(xintercept = 1, linetype = "dashed", color = "darkgrey") +
   geom_hline(yintercept = 0, linetype = "solid", color = "black") +
-  scale_color_manual(values = cluster_colors) +
-  scale_x_continuous(limits = c(0, 3.3)) +
+  scale_color_manual(values = cluster_not2d_colors) +
+  scale_x_continuous(limits = c(0, 3.5)) +
   labs(
     x = "Hazard ratio (95% CI)",
     y = NULL,
-    title = "B: Hazard ratio of pathophysiological markers",
+    title = "B: Hazard ratio for pathophysiological markers",
     color = "Subtype"
   ) +
   theme_minimal(base_size = 12) +
   theme(
-    legend.position = "none",
+    legend.position = "bottom",
     axis.text.y = element_text(size = 12),
     axis.title.x = element_text(size = 12),
     axis.text.x = element_text(size = 12),
@@ -76,25 +92,27 @@ for (i in 1:length(ipcw_dfs)) {
     arrange(study, study_id, age) %>%
     group_by(study, study_id) %>%
     mutate(
-      # tstart = case_when(row_number() == 1 ~ age, 
-      #                    TRUE ~ dplyr::lag(age, n = 1)), 
-      # tstop = age
-      baseline_age = first(age),  # Assuming 'age' at first observation is baseline
       tstart = case_when(
         row_number() == 1 ~ 0, 
         TRUE ~ age - first(age)
       ), 
       tstop = lead(tstart, default = last(age) - first(age)) 
     ) %>%
+    dplyr::filter(tstart < tstop) %>% 
+    mutate(
+      tstart_age = case_when(row_number() == 1 ~ age, 
+                         TRUE ~ dplyr::lag(age, n = 1)), 
+      tstop_age = age
+    ) %>% 
+    dplyr::filter(tstop_age <= censored_age) %>% 
     ungroup() %>% 
-    dplyr::filter((tstart < tstop) & (tstop <= censored_age)) %>% 
     mutate(cluster = factor(cluster,
                             levels = c("MOD", "SIDD", "MARD", "SIRD"),
                             labels = c("MOD", "SIDD", "MARD", "SIRD"))) %>% 
     dplyr::filter(time_to_event <= 10)
   
   
-  tdcm_fit[[i]] <- coxph(Surv(tstart, tstop, event) ~ strata(cluster), 
+  tdcm_fit[[i]] <- coxph(Surv(tstart, tstop, dmage_filter) ~ strata(cluster), 
                          data = tdcm_df, weights = ipcw_cluster)
   
   
@@ -104,6 +122,7 @@ for (i in 1:length(ipcw_dfs)) {
 
 survfit2(tdcm_fit[[1]])
 
+
 plot_incidence = survfit2(tdcm_fit[[1]]) %>% 
   ggsurvfit(.,type = "risk") +
   xlab("Time to Diabetes (years)") +
@@ -111,9 +130,10 @@ plot_incidence = survfit2(tdcm_fit[[1]]) %>%
   ggtitle("A: Crude cumulative incidence for T2D subtypes") +
   add_confidence_interval() +
   theme_minimal(base_size = 12) +
-  scale_color_manual(values = cluster_colors, name = "Subtype") +
-  scale_fill_manual(values = cluster_colors, name = "Subtype") +
+  scale_color_manual(values = cluster_not2d_colors, name = "Subtype") +
+  scale_fill_manual(values = cluster_not2d_colors, name = "Subtype") +
   theme(
+    legend.position = "none",
     axis.text = element_text(size = 12),
     axis.title = element_text(size = 12),
     panel.grid.major = element_blank(),
@@ -128,7 +148,7 @@ plot_incidence = survfit2(tdcm_fit[[1]]) %>%
 
 final_plot <- grid.arrange(plot_incidence, plot_forest, ncol = 2)
 
-ggsave(final_plot,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/hazard ratios and incidence by subtype.png"),width=16,height=8)
+ggsave(final_plot,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/hazard ratios and incidence by subtype.png"),width=17,height=10)
 
 
 
