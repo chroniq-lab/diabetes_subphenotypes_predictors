@@ -6,7 +6,7 @@ library(emmeans)
 library(contrast)
 
 source("functions/egfr_ckdepi_2021.R")
-mi_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/8 cohorts/mi_dfs.RDS"))
+mi_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs.RDS"))
 
 
 ipcw_dfs <- list()
@@ -14,15 +14,15 @@ ipcw_dfs <- list()
 for(i in 1:mi_dfs$m) {
   df <- complete(mi_dfs, action = i) %>% 
     # no available clusters in these studies
-    dplyr::filter(!study %in% c("aric", "cardia","hrs")) 
+    dplyr::filter(!study %in% c("aric", "cardia")) 
   
   
   fup15y <- df %>%
-    rename(joint_id = new_id) %>% 
+    mutate(joint_id = paste(study, study_id, sep = "_")) %>% 
     mutate(
       egfr_ckdepi_2021 = egfr_ckdepi_2021(scr = serumcreatinine,female = female,age = age),
-      ratio_th = case_when(is.na(ratio_th) ~ tgl/hdlc,
-                                TRUE ~ ratio_th),
+      # ratio_th = case_when(is.na(ratio_th) ~ tgl/hdlc,
+      #                           TRUE ~ ratio_th),
       uacr = case_when(is.na(uacr) ~ urinealbumin/urinecreatinine,
                            TRUE ~ uacr)) %>% 
     group_by(study, study_id) %>%
@@ -113,7 +113,7 @@ for(i in 1:mi_dfs$m) {
   
   # Ensure all categorical variables are factors and have correct levels if new levels might be present
   dm_df$study <- factor(dm_df$study, levels = unique(dm_df$study))
-  ltfu_equation <- clu_available ~ study + female + race_clean + min_age
+  ltfu_equation <- clu_available ~ study + female + race + min_age
   ltfu_cluster_model <- glm(ltfu_equation, data = dm_df, family = "binomial")
   dm_df$prob_cluster_fup = predict(ltfu_cluster_model,newdata=dm_df,type="response")
   
@@ -132,7 +132,7 @@ for(i in 1:mi_dfs$m) {
   ipcw_dfs[[i]] <- ipcw_df
 }
 
-saveRDS(ipcw_dfs, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/8 cohorts/dspan02_ipcw dfs.RDS"))
+saveRDS(ipcw_dfs, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan02_ipcw dfs.RDS"))
 
 
 

@@ -1,13 +1,10 @@
 rm(list = ls());gc();source(".Rprofile")
 
 
-analytic_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/8 cohorts/dsppre01_analytic df.RDS")) %>% 
-  mutate(race_clean = as.factor(race_clean),
+analytic_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dsppre01_analytic df.RDS")) %>% 
+  mutate(race = as.factor(race),
          # To avoid the warning that 'Imputation method logreg is for categorical data' -- we can convert it back later
-         female = factor(female,levels=c(0,1)),
-         med_dm_use = as.factor(med_dm_use),
-         med_bp_use = as.factor(med_bp_use),
-         med_chol_use = as.factor(med_chol_use)) %>% 
+         female = factor(female,levels=c(0,1))) %>% 
   select(-c("apo_a","apo_b","alt","sex"))
 
 colnames(analytic_df)
@@ -17,17 +14,17 @@ colnames(analytic_df)
 library(purrr)
 
 continuous_vars <- c("age", "height","weight","bmi","wc","sbp", "dbp","hba1c", 
-                     "totalc","ldlc","hdlc","vldlc","glucosef","insulinf","glucose2h",
+                     "ldlc","hdlc","vldlc","glucosef","insulinf","glucose2h",
                      "tgl", "serumcreatinine","urinecreatinine","urinealbumin",
-                     "egfr", "homa2b", "homa2ir")
+                     "egfr", "ratio_th","homa2b", "homa2ir")
 
-proportion_vars <- c("female","med_dm_use","med_bp_use","med_chol_use")
+proportion_vars <- c("female")
 
-grouped_vars <- c("race_clean")
+grouped_vars <- c("race")
 
 # Moved dmagediag to an ID variable
-id_vars <- c("study_id", "study", "wave", "cluster_study_id", "cluster", "new_id", "ratio_th","uacr",
-             "dmagediag", "dmduration", "dmfamilyhistory","available_labs", "available_anthro")
+id_vars <- c("study_id", "study", "cluster_study_id", "cluster","uacr",
+             "dmagediag", "available_labs", "available_anthro")
 
 
 library(survey)
@@ -65,4 +62,4 @@ mi_dfs <- mice(before_imputation,
 
 #df <- complete(mi_dfs, action = 1)
 
-saveRDS(mi_dfs, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/8 cohorts/mi_dfs.RDS"))
+saveRDS(mi_dfs, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs.RDS"))

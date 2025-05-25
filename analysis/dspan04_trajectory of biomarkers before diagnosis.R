@@ -53,7 +53,10 @@ wave_df <- analytic_df %>%
   distinct(joint_id,t,.keep_all=TRUE) %>% 
   mutate(across(one_of(c("subtype","race","study")),.fns=~as.factor(.)))
 
-### fix race (high % of missing values)
+saveRDS(wave_df,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan04_trajectory analysis analytic df.RDS"))
+
+wave_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan04_trajectory analysis analytic df.RDS"))
+
 summary(wave_df[,c("homa2b","t","subtype","max_age","female","study","race")])
 table(wave_df$subtype,useNA="always")
 
@@ -217,7 +220,26 @@ out_combined_not2d = out_combined %>%
 
 
 
+# scatter plot show data availability
 
+
+fig_homa2b = out_combined %>% 
+  dplyr::filter(outcome == "HOMA2B") %>%
+  mutate(cluster = factor(group, levels = c("NOT2D","MOD","SIRD","SIDD","MARD"),
+                          labels = c("No T2D","MOD","SIRD","SIDD","MARD"))) %>%
+  ggplot(aes(x = x, y = predicted, color = cluster)) +
+  geom_point(
+    data = analytic_df,
+    aes(x = t, y = homa2b, color = cluster),
+    alpha = 0.25, shape = 16, size = 1
+  ) +
+  geom_path() +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = cluster), 
+              alpha = 0.1, color = NA, show.legend = FALSE) +
+  theme_bw() + 
+  xlab("Time (years)") +
+  ylab("HOMA2-%B") +
+  scale_color_manual(name = "", values = cluster_not2d_colors)
 
 
 
