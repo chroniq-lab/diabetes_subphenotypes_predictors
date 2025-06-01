@@ -5,7 +5,7 @@ library(survminer)
 library(ggsurvfit)
 library(broom)
 
-analytic_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan02_predictors analytic dfs.RDS"))
+analytic_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan03_predictors analytic dfs.RDS"))
 
 # TDCM - longitudinal data, hazards time-varying, HR constant
 
@@ -20,13 +20,13 @@ for (i in 1:length(analytic_dfs)) {
   df <- analytic_dfs[[i]]  
   
   cluster_df <- df %>% 
-    mutate(mard = case_when(subtype == "MARD" ~ 1,
+    mutate(mard = case_when(event == 1 & (cluster == "MARD") ~ 1,
                             TRUE ~ 0),
-           mod = case_when(subtype == "MOD" ~ 1,
+           mod = case_when(event == 1 & (cluster == "MOD") ~ 1,
                            TRUE ~ 0),
-           sidd = case_when(subtype == "SIDD" ~ 1,
+           sidd = case_when(event == 1 & (cluster == "SIDD") ~ 1,
                             TRUE ~ 0),
-           sird = case_when(subtype == "SIRD" ~ 1,
+           sird = case_when(event == 1 & (cluster == "SIRD") ~ 1,
                             TRUE ~ 0))
   
   tdcm_df <- cluster_df %>%
@@ -49,23 +49,23 @@ for (i in 1:length(analytic_dfs)) {
            egfr_ckdepi_2021_scaled = egfr_ckdepi_2021/10)
   
 
-  overall_tdcm[[i]] <- coxph(Surv(tstart, tstop, event) ~ study + female + race + min_age + bmi + hba1c + homa2b 
+  overall_tdcm[[i]] <- coxph(Surv(tstart, tstop, event) ~ study + female + race + earliest_age + bmi + hba1c + homa2b 
                              + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
                              data = tdcm_df)
   
-  mard_tdcm[[i]] <- coxph(Surv(tstart, tstop, mard) ~ study + female + race + min_age + bmi + hba1c + homa2b 
+  mard_tdcm[[i]] <- coxph(Surv(tstart, tstop, mard) ~ study + female + race + earliest_age + bmi + hba1c + homa2b 
                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
                           data = tdcm_df)
   
-  mod_tdcm[[i]] <- coxph(Surv(tstart, tstop, mod) ~ study + female + race + min_age + bmi + hba1c + homa2b 
+  mod_tdcm[[i]] <- coxph(Surv(tstart, tstop, mod) ~ study + female + race + earliest_age + bmi + hba1c + homa2b 
                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
                          data = tdcm_df)
   
-  sidd_tdcm[[i]] <- coxph(Surv(tstart, tstop, sidd) ~ study + female + race + min_age + bmi + hba1c + homa2b 
+  sidd_tdcm[[i]] <- coxph(Surv(tstart, tstop, sidd) ~ study + female + race + earliest_age + bmi + hba1c + homa2b 
                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
                           data = tdcm_df)
   
-  sird_tdcm[[i]] <- coxph(Surv(tstart, tstop, sird) ~ study + female + race + min_age + bmi + hba1c + homa2b 
+  sird_tdcm[[i]] <- coxph(Surv(tstart, tstop, sird) ~ study + female + race + earliest_age + bmi + hba1c + homa2b 
                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
                           data = tdcm_df)
 
@@ -82,6 +82,6 @@ tdcm_results <- bind_rows(
   pool_results(sidd_tdcm) %>% mutate(model = "SIDD"),
   pool_results(sird_tdcm) %>% mutate(model = "SIRD")
   ) %>% 
-  write_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan03_tdcm pooled results with multiple imputation.csv"))
+  write_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan04_pooled tdcm results.csv"))
 
 

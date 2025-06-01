@@ -6,13 +6,13 @@ library(ggsurvfit)
 library(survminer)
 library(survival)
 
-tdcm_coef <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan03_tdcm pooled results with multiple imputation.csv")) %>% 
+tdcm_coef <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan04_pooled tdcm results.csv")) %>% 
   select(iv, estimate, lci, uci, model) %>% 
   dplyr::filter(model != "Overall") %>% 
   mutate(HR = paste0(format(round(estimate, 2), nsmall = 2), " (",
                         format(round(lci, 2), nsmall = 2), ", ",
                         format(round(uci, 2), nsmall = 2), ")")) %>% 
-  dplyr::filter(!iv %in% c("studymesa","studycardia","studyjhs","studydppos","raceNH Black","raceNH White","raceOther","female1","min_age")) %>% 
+  dplyr::filter(!iv %in% c("studymesa","studyjhs","studydppos","raceNH Black","raceNH White","raceOther","female","earliest_age")) %>% 
   mutate(term = case_when(
     iv == "bmi" ~ "BMI",
     iv == "sbp_scaled" ~ "SBP",
@@ -39,7 +39,7 @@ plot_forest <- ggplot(tdcm_coef, aes(y = term, x = estimate, xmin = lci, xmax = 
   geom_vline(xintercept = 1, linetype = "dashed", color = "darkgrey") +
   geom_hline(yintercept = 0, linetype = "solid", color = "black") +
   scale_color_manual(values = cluster_colors_cosmos) +
-  scale_x_continuous(limits = c(0, 3.0), breaks = seq(0, 3.0, by = 0.5)) +
+  scale_x_continuous(limits = c(0, 5.0), breaks = seq(0, 5.0, by = 1.0)) +
   labs(
     x = "Hazard ratio (95% CI)",
     y = NULL,
@@ -59,7 +59,7 @@ plot_forest <- ggplot(tdcm_coef, aes(y = term, x = estimate, xmin = lci, xmax = 
     aes(x = uci + 0.01, label = HR),
     position = position_dodge(width = 0.7),
     vjust = 0.2,
-    hjust = -0.05,
+    hjust = 0.1,
     fontface = "bold",
     size = 5
   ) 
