@@ -73,7 +73,11 @@ dppos_max_diagDays = bind_rows(
   dpp_nodm %>% mutate(dpp = 1, newdm = 0),
   dos_nodm %>% mutate(dpp = 0, newdm = 0),
 ) %>% 
-  dplyr::select(study_id,dpp,newdm,diagDays)
+  mutate(dpp_intervention = case_when(
+    dpp == 1 & treatment %in% c("Troglitazone", "Metformin", "Lifestyle") ~ 1,
+    TRUE ~ 0
+  )) %>% 
+  dplyr::select(study_id,dpp,newdm,diagDays,dpp_intervention)
 
 # saveRDS(dppos_max_diagDays,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dpp_max_diagDays.RDS"))
 
@@ -89,6 +93,14 @@ dpp_lab <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/in
   summarize(across(everything(),~mean(.,na.rm=TRUE))) %>% 
   ungroup() 
 
+# Add "visit" - 2025-06-03
+dpp_lab_visit <- dpp_lab %>% 
+  left_join(readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre02_labs.RDS")) %>% 
+              select(study_id,StudyDays,visit) %>% 
+              rename(lab_StudyDays = StudyDays) %>%
+              distinct(study_id,lab_StudyDays,.keep_all = TRUE),
+            by=c("study_id","lab_StudyDays"))
+
 dos_lab <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dospre02_labs.RDS")) %>% 
   rename(lab_StudyDays = StudyDays) %>% 
   # -release -- not there in dpp; only in dppos
@@ -97,6 +109,13 @@ dos_lab <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/in
   summarize(across(everything(),~mean(.,na.rm=TRUE))) %>% 
   ungroup()
 
+# Add "visit" - 2025-06-03
+dos_lab_visit <- dos_lab %>% 
+  left_join(readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dospre02_labs.RDS")) %>% 
+              select(study_id,StudyDays,visit) %>% 
+              rename(lab_StudyDays = StudyDays) %>% 
+              distinct(study_id,lab_StudyDays,.keep_all = TRUE),
+            by=c("study_id","lab_StudyDays"))
 
 
 dpp_anthro <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre04_anthro.RDS")) %>% 
@@ -115,8 +134,9 @@ dos_anthro <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working
   ungroup()
 
 
-lab = bind_rows(dpp_lab,
-                dos_lab) %>% 
+
+lab = bind_rows(dpp_lab_visit,
+                dos_lab_visit) %>% 
   left_join(dppos_max_diagDays,
             by=c("study_id")) %>% 
   # Removed the below to get later visits also
@@ -128,7 +148,8 @@ lab = bind_rows(dpp_lab,
 
 anthro = bind_rows(dpp_anthro,
                 dos_anthro) %>% 
-  left_join(dppos_max_diagDays,
+  left_join(dppos_max_diagDays %>% 
+              select(-dpp_intervention),
             by=c("study_id")) %>% 
   
   # Removed the below to get later visits also
@@ -174,7 +195,8 @@ dppos_longitudinal = lab %>%
   mutate(age = round(age,2),
          available_labs = rowSums(!is.na(.[,lab_vars])),
          available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
-  dplyr::select(study_id,dpp,newdm,age,dmagediag,diagDays,lab_StudyDays,anthro_StudyDays,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars),sex,race_eth) %>% 
+  dplyr::select(study_id,dpp,newdm,age,dmagediag,diagDays,lab_StudyDays,anthro_StudyDays,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars),
+                sex,race_eth,dpp_intervention,visit) %>% 
   arrange(study_id,lab_StudyDays,age)
 
 
