@@ -38,7 +38,7 @@ if(Sys.info()["user"] == "JGUO258"){
   path_diabetes_subphenotypes_predictors_folder <- "C:/Users/JGUO258/OneDrive - Emory/Papers/Predictors of Subphenotypes"
   path_prediabetes_subphenotypes_folder <- "C:/Users/JGUO258/OneDrive - Emory/Papers/Subphenotypes of Prediabetes"
   path_diabetes_subphenotypes_youth_folder <- "C:/Users/JGUO258/OneDrive - Emory/Papers/Subphenotypes in Youth-onset T2DM"
-  path_diabetes_subphenotypes_adults_folder <- "C:/Users/JGUO258/OneDrive - Emory/Papers/Diabetes Endotypes Project (JV and ZL)"
+  path_diabetes_subphenotypes_adults_folder <- "C:/Users/JGUO258/OneDrive - Emory/Papers/Diabetes Endotypes Project (JG)"
   path_g2a_longitudinal_folder <- "C:/Users/JGUO258/OneDrive - Emory/Papers/Crossnational Longitudinal Concordance"
   path_pasc_cmr_folder <- "C:/Users/JGUO258/OneDrive - Emory/Papers/PASC Cardiometabolic Risk Factors"
   path_pasc_diabetes_folder <- "C:/Users/JGUO258/OneDrive - Emory/Papers/PASC Diabetes Incidence"

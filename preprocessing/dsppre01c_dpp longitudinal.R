@@ -5,6 +5,8 @@ anthro_vars <- c("sbp","dbp","height","wc","hc","triceps","iliac","abdominal","m
 # "totalc" -- not there in dpp
 lab_vars <- c("hba1c","insulinf","glucosef","glucose2h","vldlc","tgl","hdlc","ldlc",
               "serumcreatinine","ast","alt")
+med_vars <- c("med_chol_use","med_bp_use","med_dep_use")
+lifsy_vars <- c("smoking")
 
 # Each 'release' contributed a row
 dpp_demographics <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre01_demographic.RDS")) %>% 
@@ -167,6 +169,25 @@ anthro_lab = join_by(study_id==study_id,
                      closest(lab_StudyDays <= anthro_StudyDays_plus90))
 
 
+# Add medications, smoking status - 2025-07-03
+dpp_medications <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre05_medications.RDS"))
+dos_medications <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dospre05_medications.RDS"))
+
+medications <- bind_rows(dpp_medications,dos_medications) %>% 
+  select(study_id,med_StudyDays = StudyDays,visit,med_dm_use,med_chol_use,med_bp_use,med_dep_use) 
+
+dpp_lifestyle <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre06_lifestyle.RDS"))
+dos_lifestyle <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre06_lifestyle.RDS")) 
+
+lifestyle <- bind_rows(dpp_lifestyle,dos_lifestyle) %>% 
+  mutate(smoking = case_when(
+    smk_cur == 1 | smk_cig == 1 | smk_pip == 1 ~ "Current",
+    smk_cur == 2 | smk_evr == 1 ~ "Former",
+    TRUE ~ "Never"
+  )) %>% 
+  select(study_id,lifsy_StudyDays = StudyDays,visit,smoking)
+
+
 dppos_longitudinal = lab %>%
   left_join(anthro %>% 
               dplyr::select(-dpp,-newdm,-diagDays) %>% 
@@ -175,6 +196,15 @@ dppos_longitudinal = lab %>%
             # by=c("study_id","lab_StudyDays"="anthro_StudyDays"))   %>% 
             by=anthro_lab)   %>%
   dplyr::select(-anthro_StudyDays_plus90) %>% 
+  left_join(medications,
+            by=c("study_id","lab_StudyDays"="med_StudyDays","visit")) %>% 
+  mutate(
+    med_chol_use = if_else(is.na(med_chol_use), 0, med_chol_use),
+    med_bp_use = if_else(is.na(med_bp_use), 0, med_bp_use),
+    med_dep_use = if_else(is.na(med_dep_use), 0, med_dep_use)
+  ) %>% 
+  left_join(lifestyle,
+            by=c("study_id","lab_StudyDays"="lifsy_StudyDays","visit")) %>%
   inner_join(dpp_demographics,
              by=c("study_id")) %>% 
   left_join(
@@ -195,7 +225,8 @@ dppos_longitudinal = lab %>%
   mutate(age = round(age,2),
          available_labs = rowSums(!is.na(.[,lab_vars])),
          available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
-  dplyr::select(study_id,dpp,newdm,age,dmagediag,diagDays,lab_StudyDays,anthro_StudyDays,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars),
+  dplyr::select(study_id,dpp,newdm,age,dmagediag,diagDays,lab_StudyDays,anthro_StudyDays,available_labs,available_anthro,
+                one_of(anthro_vars),one_of(lab_vars),one_of(med_vars),one_of(lifsy_vars),
                 sex,race_eth,dpp_intervention,visit) %>% 
   arrange(study_id,lab_StudyDays,age)
 

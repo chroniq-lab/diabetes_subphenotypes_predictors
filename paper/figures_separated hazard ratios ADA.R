@@ -29,7 +29,7 @@ tdcm_coef <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/wor
   ),
   term = factor(term,
                 levels = c("eGFR", "HOMA2-IR", "HOMA2-%B", "LDL", "HbA1c", "SBP", "BMI"),
-                labels = c("eGFR (per 10 mL/min/1.73 m²)", "HOMA2-IR (%)", "HOMA2-%B (per 10%)", "LDL Cholesterol (per 10 mg/dL)", "HbA1c (%)", "SBP (per 10 mmHg)", "BMI (kg/m²)"))
+                labels = c("eGFR (per 10 mL/min/1.73 m²)", "HOMA2-IR", "HOMA2-%B (per 10%)", "LDL Cholesterol (per 10 mg/dL)", "HbA1c (%)", "SBP (per 10 mmHg)", "BMI (kg/m²)"))
   ) %>% 
   mutate(model = case_when(model == "Overall" ~ "New T2D",
                            TRUE ~ model)) %>% 
