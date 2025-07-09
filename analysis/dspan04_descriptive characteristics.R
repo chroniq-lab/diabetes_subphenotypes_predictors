@@ -26,8 +26,8 @@ baseline_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/wo
 
 c_vars = c("age","dmagediag","bmi","hba1c","homa2b","homa2ir","sbp","dbp","ldlc","hdlc",
            "insulinf","glucosef","egfr_ckdepi_2021","tgl","tg_hdl","fu_time","visit_number")
-p_vars = c("female")
-g_vars = c("study","race")
+p_vars = c("female","med_bp_use","med_dep_use","med_chol_use")
+g_vars = c("study","race","smoking")
 
 
 table_df = baseline_df %>% 
@@ -36,6 +36,15 @@ table_df = baseline_df %>%
               mutate(subtype="Total")) %>% 
   table1_summary(.,c_vars = c_vars,p_vars = p_vars,g_vars = g_vars,id_vars = "subtype") %>% 
   write_csv(.,"analysis/dspan04_predictors descriptive characteristics by subtype at baseline.csv")
+
+# check N (%) -------
+lastfu_df %>%
+  group_by(med_chol_use,subtype) %>%
+  summarise(
+    n_joint_id = n_distinct(joint_id),
+    .groups = "drop"
+  ) 
+
 
 
 # last FU
@@ -47,8 +56,8 @@ lastfu_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/work
 
 c_vars = c("age","dmagediag","bmi","hba1c","homa2b","homa2ir","sbp","dbp","ldlc","hdlc",
            "insulinf","glucosef","egfr_ckdepi_2021","tgl","tg_hdl")
-p_vars = c("female")
-g_vars = c("study","race")
+p_vars = c("female","med_bp_use","med_dep_use","med_chol_use")
+g_vars = c("study","race","smoking")
 
 
 table_df = lastfu_df %>% 

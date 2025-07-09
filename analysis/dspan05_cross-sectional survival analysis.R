@@ -9,7 +9,7 @@ library(cmprsk)
 library(nnet)
 source("functions/egfr_ckdepi_2021.R")
 
-mi_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs.RDS"))
+mi_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs_new.RDS"))
 
 clean_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan01_analytic sample.RDS")) %>% 
   dplyr::filter(dpp_intervention == 1) %>% 
@@ -35,6 +35,7 @@ ph_tests_sird    <- vector("list", length(sird_coxph))
 
 for(i in 1:mi_dfs$m) {
   df <- complete(mi_dfs, action = i) %>% 
+    rename(joint_id = original_joint_id) %>%
     mutate(egfr_ckdepi_2021 = egfr_ckdepi_2021(scr = serumcreatinine,female = female,age = age),
            time_to_event = censored_age - age) %>% 
     left_join(clean_df,
@@ -116,61 +117,58 @@ for (i in 1:length(analytic_dfs)) {
                                       data = coxph_df)
   
   
-  # # Cox PH
-  # 
-  # overall_coxph[[i]] <- coxph(Surv(time_to_event, newdm_event) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-  #                             + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
-  #                             data = coxph_df)
-  # 
-  # mard_coxph[[i]] <- coxph(Surv(time_to_event, mard) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-  #                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
-  #                          data = coxph_df)
-  # 
-  # mod_coxph[[i]] <- coxph(Surv(time_to_event, mod) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-  #                         + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
-  #                         data = coxph_df)
-  # 
-  # sidd_coxph[[i]] <- coxph(Surv(time_to_event, sidd) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-  #                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
-  #                          data = coxph_df)
-  # 
-  # # CARDIA has 0 people from SIRD 
-  # # coxph_sird <- coxph_df %>% dplyr::filter(!(study == "cardia"))
-  # sird_coxph[[i]] <- coxph(Surv(time_to_event, sird) ~ study_dppos + study_jhs + study_cardia + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-  #                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
-  #                          data = coxph_df)
-  # 
-  # SDH
-  # mard_sdh[[i]] <- crr(coxph_df$time_to_event,coxph_df$cluster_numeric,cengroup = 0,failcode=1,
-  #                         cov1 = coxph_df[,c("study_cardia","study_dppos","study_jhs","female","race_black","race_hispanic","race_other","earliest_age",
-  #                                            "bmi","hba1c","homa2b_scaled","homa2ir","ldlc_scaled",
-  #                                            "sbp_scaled","egfr_ckdepi_2021_scaled","dpp_intervention")])
-  # 
-  # mod_sdh[[i]] <- crr(coxph_df$time_to_event,coxph_df$cluster_numeric,cengroup = 0,failcode=2,
-  #                      cov1 = coxph_df[,c("study_cardia","study_dppos","study_jhs","female","race_black","race_hispanic","race_other","earliest_age",
-  #                                         "bmi","hba1c","homa2b_scaled","homa2ir","ldlc_scaled",
-  #                                         "sbp_scaled","egfr_ckdepi_2021_scaled","dpp_intervention")])
-  # 
-  # sidd_sdh[[i]] <- crr(coxph_df$time_to_event,coxph_df$cluster_numeric,cengroup = 0,failcode=3,
-  #                      cov1 = coxph_df[,c("study_cardia","study_dppos","study_jhs","female","race_black","race_hispanic","race_other","earliest_age",
-  #                                         "bmi","hba1c","homa2b_scaled","homa2ir","ldlc_scaled",
-  #                                         "sbp_scaled","egfr_ckdepi_2021_scaled","dpp_intervention")])
-  # 
-  # sird_sdh[[i]] <- crr(coxph_df$time_to_event,coxph_df$cluster_numeric,cengroup = 0,failcode=4,
-  #                      # "study_cardia","dpp_intervention"
-  #                      cov1 = coxph_df[,c("study_dppos","study_jhs","female","race_black","race_hispanic","race_other","earliest_age",
-  #                                         "bmi","hba1c","homa2b_scaled","homa2ir","ldlc_scaled",
-  #                                         "sbp_scaled","egfr_ckdepi_2021_scaled")])
-  # # 
-  # ph_tests_overall[[i]] <- cox.zph(overall_coxph[[i]])
-  # 
-  # ph_tests_mard[[i]]    <- cox.zph(mard_coxph[[i]])
-  # 
-  # ph_tests_mod[[i]]     <- cox.zph(mod_coxph[[i]])
-  # 
-  # ph_tests_sidd[[i]]    <- cox.zph(sidd_coxph[[i]])
-  # 
-  # ph_tests_sird[[i]]    <- cox.zph(sird_coxph[[i]])
+  # Cox PH models
+  
+  overall_coxph[[i]] <- coxph(Surv(time_to_event, newdm_event) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
+                              + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                              data = coxph_df)
+  
+  mard_coxph[[i]] <- coxph(Surv(time_to_event, mard) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                           data = coxph_df)
+  
+  mod_coxph[[i]] <- coxph(Surv(time_to_event, mod) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
+                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                          data = coxph_df)
+  
+  sidd_coxph[[i]] <- coxph(Surv(time_to_event, sidd) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                           data = coxph_df)
+  
+  # CARDIA has 0 people from SIRD
+  # sird_coxph uses study-specific dummies
+  sird_coxph[[i]] <- coxph(Surv(time_to_event, sird) ~ study_dppos + study_jhs + study_cardia + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
+                           data = coxph_df)
+  
+  # SDH competing risk models (crr)
+  mard_sdh[[i]] <- crr(coxph_df$time_to_event, coxph_df$cluster_numeric, cengroup = 0, failcode = 1,
+                       cov1 = coxph_df[, c("study_cardia", "study_dppos", "study_jhs", "female", "race_black", "race_hispanic", "race_other", "earliest_age",
+                                           "bmi", "hba1c", "homa2b_scaled", "homa2ir", "ldlc_scaled",
+                                           "sbp_scaled", "egfr_ckdepi_2021_scaled", "dpp_intervention")])
+  
+  mod_sdh[[i]] <- crr(coxph_df$time_to_event, coxph_df$cluster_numeric, cengroup = 0, failcode = 2,
+                      cov1 = coxph_df[, c("study_cardia", "study_dppos", "study_jhs", "female", "race_black", "race_hispanic", "race_other", "earliest_age",
+                                          "bmi", "hba1c", "homa2b_scaled", "homa2ir", "ldlc_scaled",
+                                          "sbp_scaled", "egfr_ckdepi_2021_scaled", "dpp_intervention")])
+  
+  sidd_sdh[[i]] <- crr(coxph_df$time_to_event, coxph_df$cluster_numeric, cengroup = 0, failcode = 3,
+                       cov1 = coxph_df[, c("study_cardia", "study_dppos", "study_jhs", "female", "race_black", "race_hispanic", "race_other", "earliest_age",
+                                           "bmi", "hba1c", "homa2b_scaled", "homa2ir", "ldlc_scaled",
+                                           "sbp_scaled", "egfr_ckdepi_2021_scaled", "dpp_intervention")])
+  
+  sird_sdh[[i]] <- crr(coxph_df$time_to_event, coxph_df$cluster_numeric, cengroup = 0, failcode = 4,
+                       cov1 = coxph_df[, c("study_dppos", "study_jhs", "female", "race_black", "race_hispanic", "race_other", "earliest_age",
+                                           "bmi", "hba1c", "homa2b_scaled", "homa2ir", "ldlc_scaled",
+                                           "sbp_scaled", "egfr_ckdepi_2021_scaled")])
+  
+  # PH assumption tests
+  ph_tests_overall[[i]] <- cox.zph(overall_coxph[[i]])
+  ph_tests_mard[[i]]    <- cox.zph(mard_coxph[[i]])
+  ph_tests_mod[[i]]     <- cox.zph(mod_coxph[[i]])
+  ph_tests_sidd[[i]]    <- cox.zph(sidd_coxph[[i]])
+  ph_tests_sird[[i]]    <- cox.zph(sird_coxph[[i]])
+  
   
 }
 

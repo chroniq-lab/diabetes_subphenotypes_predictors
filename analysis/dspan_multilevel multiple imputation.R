@@ -2,10 +2,8 @@ rm(list = ls());gc();source(".Rprofile")
 
 
 analytic_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan01_analytic sample.RDS")) %>% 
-  mutate(joint_id = as.integer(as.factor(joint_id)))
-  # mutate(race = as.factor(race),
-  #        # To avoid the warning that 'Imputation method logreg is for categorical data' -- we can convert it back later
-  #        female = factor(female,levels=c(0,1))) 
+  mutate(original_joint_id = paste(study, study_id, sep = "_"),   # for later restoration
+         mice_id = as.integer(as.factor(paste(study, study_id, sep = "_"))))  # for multilevel mice
 
 colnames(analytic_df)
 
@@ -22,7 +20,7 @@ vars_to_check  <- c("age", "height","weight","bmi","wc","sbp", "dbp","hba1c",
 problem_vars <- c()
 for (var in vars_to_check) {
   n_all_na <- analytic_df %>%
-    group_by(joint_id) %>%
+    group_by(mice_id) %>%
     summarise(all_na = all(is.na(.data[[var]]))) %>%
     dplyr::filter(all_na) %>%
     nrow()
@@ -39,8 +37,8 @@ multilevel_vars <- c("age", "height","weight","bmi","sbp", "dbp","hba1c")
 # grouped_vars <- c("race")
 
 # Moved dmagediag to an ID variable
-id_vars <- c("study_id", "study", "joint_id","cluster_study_id", "cluster","newdm_event",
-             "dmagediag", "t", "earliest_age", "censored_age",
+id_vars <- c("study_id", "study", "mice_id","original_joint_id","cluster_study_id", 
+             "cluster","newdm_event","dmagediag", "t", "earliest_age", "censored_age",
              # no NA
              "female", "race")
 
@@ -53,8 +51,6 @@ before_imputation <- analytic_df  %>%
     any_of(id_vars),
     any_of(problem_vars),
     any_of(multilevel_vars)
-    # any_of(proportion_vars),
-    # any_of(grouped_vars)
   ) 
 
 # Get initial method and pred
@@ -85,9 +81,9 @@ pred[,id_vars] <- 0
 # For multilevel, set cluster variable (joint_id) to -2 for the multilevel vars
 for (v in vars_to_check) {
   if (v %in% problem_vars) {
-    pred[v, "joint_id"] <- 0
+    pred[v, "mice_id"] <- 0
   } else {
-    pred[v, "joint_id"] <- -2
+    pred[v, "mice_id"] <- -2
   }
 }
 
@@ -95,11 +91,11 @@ for (v in vars_to_check) {
 
 mi_dfs <- mice(before_imputation,
                method = method,
-               pred = pred,
+               predictorMatrix = pred,
                m=10,maxit=50,seed=500)
 
-#df <- complete(mi_dfs, action = 1)
+df <- complete(mi_dfs, action = 1)
 
-saveRDS(mi_dfs, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs.RDS"))
+saveRDS(mi_dfs, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs_new.RDS"))
 
 

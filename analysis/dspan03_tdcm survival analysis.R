@@ -7,11 +7,12 @@ library(ggsurvfit)
 library(broom)
 
 source("functions/egfr_ckdepi_2021.R")
-mi_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs.RDS"))
+mi_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs_new.RDS"))
 
 clean_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan01_analytic sample.RDS")) %>% 
   dplyr::filter(dpp_intervention == 1) %>% 
-  distinct(study,study_id,dpp_intervention) # n = 60
+  distinct(study,study_id,joint_id,dpp_intervention) # n = 60
+
 
 # TDCM - longitudinal data, hazards time-varying, HR constant
 analytic_dfs <- list()
@@ -24,10 +25,11 @@ sird_tdcm <- list()
 
 for(i in 1:mi_dfs$m) {
   df <- complete(mi_dfs, action = i) %>% 
+    rename(joint_id = original_joint_id) %>% 
     mutate(egfr_ckdepi_2021 = egfr_ckdepi_2021(scr = serumcreatinine,female = female,age = age),
            time_to_event = censored_age - age) %>% 
     left_join(clean_df,
-              by = c("study","study_id")) %>% 
+              by = c("study","study_id","joint_id")) %>% 
     mutate(dpp_intervention = case_when(
       dpp_intervention == 1 ~ 1,
       TRUE ~ 0

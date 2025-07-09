@@ -9,9 +9,13 @@ library(broom)
 source("functions/egfr_ckdepi_2021.R")
 mi_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs_new.RDS"))
 
-clean_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan01_analytic sample.RDS")) %>% 
-  dplyr::filter(dpp_intervention == 1) %>% 
-  distinct(study,study_id,joint_id,dpp_intervention) # n = 60
+clean_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan01_analytic sample.RDS")) %>%
+  select(study,study_id,joint_id,dpp_intervention,smoking,med_chol_use,med_bp_use,med_dep_use) %>% 
+  distinct(study,study_id,joint_id,dpp_intervention,.keep_all = TRUE) %>% 
+  mutate(dpp_intervention = case_when(
+    dpp_intervention == 1 ~ 1,
+    TRUE ~ 0
+  ))
 
 # TDCM - longitudinal data, hazards time-varying, HR constant
 analytic_dfs <- list()
@@ -29,13 +33,17 @@ for(i in 1:mi_dfs$m) {
            time_to_event = censored_age - age) %>% 
     left_join(clean_df,
               by = c("study","study_id","joint_id")) %>% 
-    mutate(dpp_intervention = case_when(
-      dpp_intervention == 1 ~ 1,
-      TRUE ~ 0
-    )) %>% 
-    # exclude intervention arm
-    dplyr::filter(dpp_intervention == 0)
-  
+    mutate(dpp_intervention = case_when(dpp_intervention == 1 ~ 1,
+                                        TRUE ~ 0),
+           smoking = case_when(is.na(smoking) ~ "Never",
+                               TRUE ~ smoking),
+           med_bp_use = case_when(is.na(med_bp_use) ~ 0,
+                                  TRUE ~ med_bp_use),
+           med_chol_use = case_when(is.na(med_chol_use) ~ 0,
+                                    TRUE ~ med_chol_use),
+           med_dep_use = case_when(is.na(med_dep_use) ~ 0,
+                                   TRUE ~ med_dep_use))
+
   
   analytic_df <- df %>% 
     arrange(study,study_id,joint_id,age) %>% 
@@ -86,25 +94,30 @@ for (i in 1:length(analytic_dfs)) {
   
   
   overall_tdcm[[i]] <- coxph(Surv(tstart, tstop, event_true) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                             + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
+                             + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled
+                             + smoking + med_chol_use + med_bp_use + med_dep_use, 
                              data = tdcm_df, cluster = joint_id)
   
   mard_tdcm[[i]] <- coxph(Surv(tstart, tstop, mard) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
+                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled
+                          + smoking + med_chol_use + med_bp_use + med_dep_use, 
                           data = tdcm_df, cluster = joint_id)
   
   mod_tdcm[[i]] <- coxph(Surv(tstart, tstop, mod) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                         + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
+                         + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled
+                         + smoking + med_chol_use + med_bp_use + med_dep_use, 
                          data = tdcm_df, cluster = joint_id)
   
   sidd_tdcm[[i]] <- coxph(Surv(tstart, tstop, sidd) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
+                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled
+                          + smoking + med_chol_use + med_bp_use + med_dep_use, 
                           data = tdcm_df, cluster = joint_id)
   
   # CARDIA has 0 people from SIRD 
   tdcm_sird <- tdcm_df %>% dplyr::filter(!study %in% c("cardia"))
   sird_tdcm[[i]] <- coxph(Surv(tstart, tstop, sird) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
+                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled
+                          + smoking + med_chol_use + med_bp_use + med_dep_use, 
                           data = tdcm_df, cluster = joint_id)
   
   
@@ -137,7 +150,7 @@ unpooled_resuts <- bind_rows(
   
 )
 
-write_csv(unpooled_resuts, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspse03_unpooled tdcm results without dpp intervention.csv"))
+write_csv(unpooled_resuts, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspse04_unpooled tdcm results with smoking and medications.csv"))
 
 source("functions/pool_results.R")
 
@@ -148,6 +161,6 @@ tdcm_results <- bind_rows(
   pool_results(sidd_tdcm) %>% mutate(model = "SIDD"),
   pool_results(sird_tdcm) %>% mutate(model = "SIRD")
 ) %>% 
-  write_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspse03_pooled tdcm results without dpp intervention.csv"))
+  write_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspse04_pooled tdcm results with smoking and medications.csv"))
 
 

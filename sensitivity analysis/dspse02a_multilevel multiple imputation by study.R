@@ -1,11 +1,10 @@
 rm(list = ls());gc();source(".Rprofile")
 
 
-analytic_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan01_analytic sample.RDS")) %>% 
-  mutate(joint_id = as.integer(as.factor(joint_id)))
-  # mutate(race = as.factor(race),
-  #        # To avoid the warning that 'Imputation method logreg is for categorical data' -- we can convert it back later
-  #        female = factor(female,levels=c(0,1))) 
+analytic_df <- readRDS("C:/Users/JGUO258/OneDrive - Emory/Papers/Predictors of Subphenotypes/working/processed/dspan01_analytic sample.RDS") %>% 
+  select(-joint_id) %>% 
+  mutate(original_joint_id = paste(study, study_id, sep = "_"),   # for later restoration
+         mice_id = as.integer(as.factor(paste(study, study_id, sep = "_"))))  # for multilevel mice 
 
 colnames(analytic_df)
 
@@ -22,9 +21,9 @@ vars_to_check  <- c("age", "height","weight","bmi","wc","sbp", "dbp","hba1c",
 problem_vars <- c()
 for (var in vars_to_check) {
   n_all_na <- analytic_df %>%
-    group_by(joint_id) %>%
+    group_by(mice_id) %>%
     summarise(all_na = all(is.na(.data[[var]]))) %>%
-    filter(all_na) %>%
+    dplyr::filter(all_na) %>%
     nrow()
   if (n_all_na > 0) problem_vars <- c(problem_vars, var)
 }
@@ -39,7 +38,7 @@ multilevel_vars <- c("age", "height","weight","bmi","sbp", "dbp","hba1c")
 # grouped_vars <- c("race")
 
 # Moved dmagediag to an ID variable
-id_vars <- c("study_id", "study", "joint_id","cluster_study_id", "cluster","newdm_event",
+id_vars <- c("study_id", "study", "mice_id","original_joint_id","cluster_study_id", "cluster","newdm_event",
              "dmagediag", "t", "earliest_age", "censored_age",
              # no NA
              "female", "race")
@@ -77,9 +76,9 @@ impute_study <- function(study_name) {
   
   for (v in vars_to_check) {
     if (v %in% problem_vars) {
-      pred_sub[v, "joint_id"] <- 0
+      pred_sub[v, "mice_id"] <- 0
     } else {
-      pred_sub[v, "joint_id"] <- -2
+      pred_sub[v, "mice_id"] <- -2
     }
   }
   

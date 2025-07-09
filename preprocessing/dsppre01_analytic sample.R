@@ -66,7 +66,6 @@ longitudinal_df = bind_rows(aric_longitudinal %>% mutate(study_id = as.numeric(s
                             TRUE ~ NA_real_)
   ) 
 
-
 saveRDS(longitudinal_df,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01_longitudinal df.RDS"))
 
 #--------------------------------------------------------------------------------------------------------------------

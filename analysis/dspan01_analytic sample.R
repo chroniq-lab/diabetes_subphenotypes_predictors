@@ -291,6 +291,16 @@ clean_df <- selected_df %>%
                        TRUE ~ homa2b),
     homa2ir = case_when(homa2ir>10 ~ 10,
                         TRUE ~ homa2ir)
+  ) %>% 
+  mutate(
+    smoking = case_when(is.na(smoking) ~ "Never",
+                        TRUE ~ smoking),
+    med_bp_use = case_when(is.na(med_bp_use) ~ 0,
+                            TRUE ~ med_bp_use),
+    med_chol_use = case_when(is.na(med_chol_use) ~ 0,
+                           TRUE ~ med_chol_use),
+    med_dep_use = case_when(is.na(med_dep_use) ~ 0,
+                           TRUE ~ med_dep_use)
   )
 
 
