@@ -35,7 +35,8 @@ for(i in 1:cardia_mi_dfs$m) {
   pooled_df <- bind_rows(cardia_df,
                          dppos_df,
                          jhs_df,
-                         mesa_df)
+                         mesa_df) %>% 
+    rename(joint_id = original_joint_id)
   
   df <- pooled_df %>% 
     mutate(egfr_ckdepi_2021 = egfr_ckdepi_2021(scr = serumcreatinine,female = female,age = age),
