@@ -24,6 +24,8 @@ sidd_coxph <- list()
 sird_coxph <- list()
 
 
+###################### BASELINE ############################
+
 for(i in 1:mi_dfs$m) {
   df <- complete(mi_dfs, action = i) %>% 
     rename(joint_id = original_joint_id) %>%
@@ -50,7 +52,7 @@ for(i in 1:mi_dfs$m) {
   cluster_df <- analytic_df %>% 
     mutate(mard = case_when(cluster == "MARD" ~ 1,
                             TRUE ~ 0),
-           mod = case_when(cluster == "MOD" ~ 1,
+           mod = case_when(cluster ==  "MOD" ~ 1,
                            TRUE ~ 0),
            sidd = case_when(cluster == "SIDD" ~ 1,
                             TRUE ~ 0),
@@ -111,7 +113,7 @@ for(i in 1:mi_dfs$m) {
 
 
 
-source("functions/evaluate_coxph.R")
+source("functions/evaluate_coxph01.R")
 
 
 # Prepare list to store evaluation metrics for each model
@@ -152,3 +154,146 @@ pooled_long <- purrr::imap_dfr(pooled_results, ~mutate(.x, model = .y)) %>%
 write.csv(pooled_long, "analysis/dspan06_pooled coxph model metrics.csv", row.names = FALSE)
 
 
+###################### RANDOM VISIT ############################
+
+set.seed(42) 
+
+for(i in 1:mi_dfs$m) {
+  df <- complete(mi_dfs, action = i) %>% 
+    rename(joint_id = original_joint_id) %>%
+    mutate(egfr_ckdepi_2021 = egfr_ckdepi_2021(scr = serumcreatinine,female = female,age = age),
+           time_to_event = censored_age - age) %>% 
+    left_join(clean_df,
+              by = c("study","study_id")) %>% 
+    mutate(dpp_intervention = case_when(
+      dpp_intervention == 1 ~ 1,
+      TRUE ~ 0
+    ))
+  
+  
+  analytic_df <- df %>% 
+    arrange(study,study_id,joint_id,age) %>% 
+    group_by(study,study_id,joint_id) %>%
+    mutate(event = case_when(
+      newdm_event == 1 & (age == censored_age) ~ 1,  # event is 1 for the last wave
+      TRUE ~ 0 
+    )) %>%
+    ungroup() 
+  
+  
+  cluster_df <- analytic_df %>% 
+    mutate(mard = case_when(cluster == "MARD" ~ 1,
+                            TRUE ~ 0),
+           mod = case_when(cluster ==  "MOD" ~ 1,
+                           TRUE ~ 0),
+           sidd = case_when(cluster == "SIDD" ~ 1,
+                            TRUE ~ 0),
+           sird = case_when(cluster == "SIRD" ~ 1,
+                            TRUE ~ 0)) 
+  
+  coxph_df <- cluster_df %>%
+    # one random visit per person
+    group_by(joint_id) %>%
+    dplyr::slice_sample(n = 1) %>%
+    ungroup() %>% 
+    mutate(across(c(bmi, hba1c, homa2b, homa2ir, ldlc, sbp, egfr_ckdepi_2021), ~replace(., is.infinite(.), NA))) %>% 
+    # error due to 0 ppl in NH Other (sidd == 1), ignore this category
+    mutate(race = case_when(race == "NH Other" ~ "Other", 
+                            TRUE ~ race),
+           race = relevel(factor(race), ref = "NH White")) %>% 
+    # scaling
+    mutate(sbp_scaled = sbp/10,
+           ldlc_scaled = ldlc/10,
+           homa2b_scaled = homa2b/10,
+           egfr_ckdepi_2021_scaled = egfr_ckdepi_2021/10) %>% 
+    mutate(subtype = case_when(is.na(cluster) ~ "NOT2D",
+                               TRUE ~ cluster)) %>%
+    mutate(subtype = factor(subtype, levels=c("NOT2D","MARD","MOD","SIDD","SIRD")),
+           study_cardia = case_when (study == "cardia" ~ 1,
+                                     TRUE ~ 0),
+           study_dppos = case_when(study == "dppos" ~ 1,
+                                   TRUE ~ 0),
+           study_jhs = case_when(study == "jhs" ~ 1,
+                                 TRUE ~ 0),
+           study_mesa= case_when(study == "mesa" ~ 1,
+                                 TRUE ~ 0))
+  
+  coxph_dfs[[i]] <- coxph_df
+  
+  
+  # Cox PH models
+  
+  overall_coxph[[i]] <- coxph(Surv(time_to_event, newdm_event) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
+                              + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                              data = coxph_df)
+  
+  mard_coxph[[i]] <- coxph(Surv(time_to_event, mard) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                           data = coxph_df)
+  
+  mod_coxph[[i]] <- coxph(Surv(time_to_event, mod) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
+                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                          data = coxph_df)
+  
+  sidd_coxph[[i]] <- coxph(Surv(time_to_event, sidd) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                           data = coxph_df)
+  
+  # CARDIA has 0 people from SIRD
+  # sird_coxph uses study-specific dummies
+  sird_coxph[[i]] <- coxph(Surv(time_to_event, sird) ~ study_dppos + study_jhs + study_cardia + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled, 
+                           data = coxph_df)
+}
+
+
+
+source("functions/evaluate_coxph02.R")
+
+
+pooled_results <- vector("list", length(model_names))
+names(pooled_results) <- model_names
+
+M <- length(coxph_dfs)
+
+for (model_name in model_names) {
+  model_list <- get(model_name, inherits = TRUE)
+  if (!is.list(model_list) || length(model_list) != M) {
+    stop(sprintf("`%s` must be a list of %d models (one per imputation).", model_name, M))
+  }
+  
+  pooled_metrics <- map2(seq_len(M), coxph_dfs, function(i, df) {
+    model <- model_list[[i]]
+    # No need to recompute event here; your evaluator uses time_to_event + event
+    evaluate_coxph(model, df, time_horizon,
+                   cutpoints = c(0.10, 0.25, 0.50, 0.75, 0.90))
+  })
+  
+  pooled_df <- bind_rows(pooled_metrics, .id = "imputation") %>%
+    mutate(across(c(sensitivity, specificity, F1, c_index, cal_slope), as.numeric),
+           threshold = as.numeric(threshold))
+  
+  pooled_summary <- pooled_df %>%
+    group_by(threshold) %>%
+    summarise(
+      across(c(sensitivity, specificity, F1, c_index, cal_slope),
+             list(mean = ~mean(.x, na.rm = TRUE),
+                  sd   = ~sd(.x,   na.rm = TRUE))),
+      .groups = "drop"
+    )
+  
+  pooled_results[[model_name]] <- pooled_summary
+}
+
+
+pooled_long <- purrr::imap_dfr(pooled_results, ~mutate(.x, model = .y)) %>% 
+  mutate(
+    sensitivity = sprintf("%.3f (%.3f)", sensitivity_mean, sensitivity_sd),
+    specificity = sprintf("%.3f (%.3f)", specificity_mean, specificity_sd),
+    f1          = sprintf("%.3f (%.3f)", F1_mean, F1_sd),
+    c_index     = sprintf("%.3f (%.3f)", c_index_mean, c_index_sd),
+    cal_slope   = sprintf("%.3f (%.3f)", cal_slope_mean, cal_slope_sd)
+  ) %>%
+  select(model, threshold, sensitivity, specificity, f1, c_index, cal_slope)
+
+write.csv(pooled_long, "analysis/dspan06_pooled coxph model metrics random visit.csv", row.names = FALSE)
