@@ -1,0 +1,199 @@
+
+R version 4.4.2 (2024-10-31 ucrt) -- "Pile of Leaves"
+Copyright (C) 2024 The R Foundation for Statistical Computing
+Platform: x86_64-w64-mingw32/x64
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ dplyr     1.1.4     ✔ readr     2.1.5
+✔ forcats   1.0.0     ✔ stringr   1.5.1
+✔ ggplot2   3.5.1     ✔ tibble    3.2.1
+✔ lubridate 1.9.3     ✔ tidyr     1.3.1
+✔ purrr     1.0.2     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ ::() masks 
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+> rm(list = ls());gc();source(".Rprofile")
+          used (Mb) gc trigger (Mb) max used (Mb)
+Ncells  903655 48.3    1778178   95  1267241 67.7
+Vcells 1401471 10.7    8388608   64  2170770 16.6
+> 
+> 
+> analytic_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan01_analytic sample.RDS")) %>% 
++   mutate(original_joint_id = paste(study, study_id, sep = "_"),   # for later restoration
++          mice_id = as.integer(as.factor(paste(study, study_id, sep = "_"))))  # for multilevel mice
+> 
+> colnames(analytic_df)
+ [1] "study_id"          "age"               "dmagediag"        
+ [4] "female"            "available_labs"    "available_anthro" 
+ [7] "sbp"               "dbp"               "height"           
+[10] "wc"                "bmi"               "hba1c"            
+[13] "insulinf"          "glucosef"          "glucose2h"        
+[16] "tgl"               "hdlc"              "ldlc"             
+[19] "serumcreatinine"   "urinecreatinine"   "egfr"             
+[22] "apo_a"             "apo_b"             "uric_acid"        
+[25] "race_rev"          "race"              "study"            
+[28] "joint_id"          "year"              "vldlc"            
+[31] "med_bp_use"        "med_chol_use"      "med_dep_use"      
+[34] "smoking"           "race_eth"          "dpp"              
+[37] "diagDays"          "lab_StudyDays"     "anthro_StudyDays" 
+[40] "hc"                "triceps"           "iliac"            
+[43] "abdominal"         "medial"            "ast"              
+[46] "alt"               "sex"               "treatment"        
+[49] "visit"             "dpp_intervention"  "exam"             
+[52] "ethnicity"         "insulinf2"         "glucosef2"        
+[55] "urinealbumin"      "uacr"              "newdm_event"      
+[58] "weight"            "homa2b"            "homa2ir"          
+[61] "cluster_study_id"  "cluster"           "egfr_ckdepi_2021" 
+[64] "earliest_age"      "censored_age"      "t"                
+[67] "subtype"           "original_joint_id" "mice_id"          
+> 
+> 
+> # detect outliers
+> library(purrr)
+> 
+> # detect variables all NA for some people
+> vars_to_check  <- c("age", "height","weight","bmi","wc","sbp", "dbp","hba1c", 
++                      "ldlc","hdlc","glucosef","insulinf","glucose2h",
++                      "tgl", "serumcreatinine","homa2b", "homa2ir")
+> 
+> 
+> problem_vars <- c()
+> for (var in vars_to_check) {
++   n_all_na <- analytic_df %>%
++     group_by(mice_id) %>%
++     summarise(all_na = all(is.na(.data[[var]]))) %>%
++     dplyr::filter(all_na) %>%
++     nrow()
++   if (n_all_na > 0) problem_vars <- c(problem_vars, var)
++ }
+> print(problem_vars)
+ [1] "weight"          "wc"              "ldlc"            "hdlc"           
+ [5] "glucosef"        "insulinf"        "glucose2h"       "tgl"            
+ [9] "serumcreatinine" "homa2b"          "homa2ir"        
+> 
+> 
+> 
+> multilevel_vars <- c("age", "height","bmi","wc","sbp", "dbp","hba1c")
+> 
+> # proportion_vars <- c("female")
+> # 
+> # grouped_vars <- c("race")
+> 
+> # Moved dmagediag to an ID variable
+> id_vars <- c("study_id", "study", "mice_id","original_joint_id","cluster_study_id", 
++              "cluster","newdm_event","dmagediag", "t", "earliest_age", "censored_age",
++              # no NA
++              "female", "race")
+> 
+> 
+> library(survey)
+Loading required package: grid
+Loading required package: Matrix
+
+Attaching package: 'Matrix'
+
+The following objects are masked from 'package:tidyr':
+
+    expand, pack, unpack
+
+Loading required package: survival
+
+Attaching package: 'survey'
+
+The following object is masked from 'package:graphics':
+
+    dotchart
+
+Warning message:
+package 'survival' was built under R version 4.4.3 
+> library(mice)
+
+Attaching package: 'mice'
+
+The following object is masked from 'package:stats':
+
+    filter
+
+The following objects are masked from 'package:base':
+
+    cbind, rbind
+
+> 
+> before_imputation <- analytic_df  %>% 
++   dplyr::select(
++     any_of(id_vars),
++     any_of(problem_vars),
++     any_of(multilevel_vars)
++   ) 
+> 
+> # Get initial method and pred
+> mi_null <- mice(before_imputation, maxit = 0)
+Warning message:
+Number of logged events: 5 
+> method = mi_null$method
+> pred = mi_null$predictorMatrix
+> 
+> # assign methods
+> method[problem_vars] <- "pmm" 
+> method[multilevel_vars ] <- "2l.norm"
+> # method[proportion_vars] <- "2l.bin"
+> # method[grouped_vars] <- "2l.pmm"
+> method[id_vars] <- ""
+> 
+> method["weight"] <- "~I(bmi*(height/100)^2)"
+> 
+> pred[c("homa2b","homa2ir"),] <- 0
+> pred[c("homa2b","homa2ir"),c("insulinf","glucosef")] <- 1
+> 
+> 
+> 
+> pred[,] <- 1         # Allow all variables as predictors by default
+> 
+> # Set cluster indicators for multilevel imputation
+> pred[multilevel_vars, "mice_id"] <- -2  # Set mice_id as cluster indicator for multilevel vars
+> 
+> # Set predictors for ID variables
+> pred[id_vars,] <- 0  # ID variables are not used as predictors
+> pred[,id_vars] <- 0  # ID variables are not used as outcomes
+> pred[,"mice_id"] <- 0  # Reset mice_id column except for multilevel vars
+> pred[multilevel_vars, "mice_id"] <- -2  # Restore cluster indicator for multilevel vars
+> 
+> # For non-multilevel variables (problem_vars), ensure they don't use multilevel imputation
+> for (v in problem_vars) {
++   if(!(v %in% multilevel_vars)) {  # Only if not already in multilevel_vars
++     pred[v, "mice_id"] <- 0
++   }
++ }
+> 
+> 
+> 
+> mi_dfs <- mice(before_imputation,
++                method = method,
++                predictorMatrix = pred,
++                m=10,maxit=50,seed=500)
+
+ iter imp variable
+  1   1  weight  wc  ldlc  hdlc  glucosef  insulinf  glucose2h  tgl  serumcreatinine  homa2b  homa2ir  height  bmi  sbp  dbp  hba1c
+  1   2  weight  wc  ldlc  hdlc  glucosef  insulinf  glucose2h  tgl  serumcreatinine  homa2b  homa2ir  height  bmi  sbp  dbp  hba1c
+  1   3  weight  wc  ldlc  hdlc  glucosef  insulinf  glucose2h  tgl  serumcreatinine  homa2b  homa2ir  height  bmi  sbp  dbp  hba1c
+  1   4  weight  wc  ldlc  hdlc  glucosef  insulinf  glucose2h  tgl  serumcreatinine  homa2b  homa2ir  height  bmi  sbp  dbp  hba1c
+  1   5  weight  wc  ldlc  hdlc  glucosef  insulinf  glucose2h  tgl  serumcreatinine  homa2b  homa2ir  height  bmi  sbp  dbp  hba1c
+  1   6  weight  wc  ldlc  hdlc  glucosef  insulinf  glucose2h  tgl  serumcreatinine  homa2b  homa2ir  height  bmi  sbp  dbp  hba1c
+  1   7  weight  wc  ldlc  hdlc  glucosef  insulinf  glucose2h  tgl  serumcreatinine  homa2b  homa2ir  height  bmi  sbp  dbp  hba1c
+  1   8  weight  wc  ldlc  hdlc  glucosef  insulinf  glucose2h  tgl  serumcreatinine  homa2b  homa2ir  height  bmi  sbp  dbp  hba1c
+  1   9  weight  wc  ldlc  hdlc  glucosef  insulinf  glucose2h  tgl  serumcreatinine  homa2b  homa2ir  height  bmi  sbp  dbp  hba1c
+  1   10  weight  wc  ldlc  hdlc  glucosef  insulinf  glucose2h  tgl  serumcreatinine  homa2b  homa2ir  height  bmi  sbp  dbp

@@ -7,13 +7,23 @@ lab_vars <- c("hba1c","insulinf","glucosef","tgl","hdlc","ldlc",
 med_vars <- c("med_chol_use","med_bp_use","med_dep_use")
 lifsy_vars <- c("smoking")
 
+# N = 268
 jhs_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/jhs_newdm.RDS")) 
 jhs_baselinedm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/jhs_baseline_dm.RDS")) 
 
 jhs_analysis <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/jhspre01_jhs_analysis.RDS")) %>% 
+  arrange(study_id,visit) %>% 
+  group_by(study_id) %>% 
+  mutate(dmagediag_ever = min(dmagediag,na.rm=TRUE)) %>% 
+  ungroup() %>% 
+  mutate(dmagediag_ever = case_when(dmagediag_ever == Inf ~ NA_real_,
+                                    TRUE ~ dmagediag_ever)) %>% 
+           
   dplyr::filter(aric == 0) %>% 
   dplyr::filter(!study_id %in% jhs_baselinedm$study_id) %>%
-  arrange(study_id,visit) %>% 
+  dplyr::filter(!is.na(age)) %>% 
+  distinct(study_id,visit,bmi,.keep_all =TRUE) %>%
+  
   mutate(race_eth = "NH Black",
          female = case_when(female == "Female" ~ 1,
                             female == "Male" ~ 0,
@@ -38,14 +48,22 @@ jhs_analysis <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/worki
     med_dep_use = case_when(med_dep_past == "Y" ~ 1,
                             med_dep_past == "N" ~ 0,
                             TRUE ~ 0)
-  )
+  ) 
+
+# N = 1,511, OBS = 3,787
+jhs_nodm <- jhs_analysis %>% 
+  dplyr::filter(!study_id %in% jhs_newdm$study_id) %>% 
+  dplyr::filter(is.na(dmagediag_ever)) 
+
 
 # jhs_longitudinal --------------
 
 # Haven't filtered out observations where age >= dmagediag
 
 jhs_longitudinal = jhs_analysis %>% 
-  dplyr::select(-dmagediag) %>% 
+  # only keep newDM + noDM
+  dplyr::filter(study_id %in% jhs_newdm$study_id | study_id %in% jhs_nodm$study_id) %>% 
+  dplyr::select(-dmagediag,-dmagediag_ever) %>% 
   # Bringing the updated dmagediag from aric_events
   left_join(jhs_newdm %>% 
               dplyr::select(study_id,dmagediag),
@@ -55,7 +73,6 @@ jhs_longitudinal = jhs_analysis %>%
     available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
   dplyr::select(study_id,age,dmagediag,available_labs,available_anthro,female,race_eth,
                 one_of(anthro_vars),one_of(lab_vars),one_of(med_vars),one_of(lifsy_vars))
-
 
 
 saveRDS(jhs_longitudinal,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01e_jhs.RDS"))

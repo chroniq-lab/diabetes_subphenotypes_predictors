@@ -7,11 +7,22 @@ lab_vars <- c("hba1c","insulinf2","glucosef2","tgl","hdlc","ldlc",
 med_vars <- c("med_chol_use","med_bp_use","med_dep_use")
 lifsy_vars <- c("smoking")
 
+# N = 989
 mesa_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/mesa_newdm.RDS")) 
 mesa_baselinedm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/mesa_baseline_dm.RDS")) 
 
 mesa_dat_all <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/mesa_dat_all.RDS")) %>% 
+  arrange(study_id,exam)%>% 
+  group_by(study_id)%>% 
+  mutate(dmagediag_ever = min(dia_med_age_st,na.rm=TRUE)) %>% ## dia_med_age_st, available at exam1, the earliest age when started diabetes treatment. 
+  ungroup() %>% 
+  mutate(dmagediag_ever = case_when(dmagediag_ever == Inf ~ NA_real_,
+                                    TRUE ~ dmagediag_ever)) %>% 
+
   dplyr::filter(!study_id %in% mesa_baselinedm$study_id) %>% 
+  distinct(study_id,exam,bmi,.keep_all =TRUE) %>%
+  dplyr::filter(!is.na(age)) %>% 
+  
   arrange(study_id,exam) %>% 
   dplyr::mutate(ratio_th=tgl/hdlc,
                 glucosef2=glucosef*0.0555,
@@ -50,10 +61,19 @@ mesa_dat_all <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/worki
                   med_dep == 1 ~ 1,
                   med_dep == 0 ~ 0,
                   TRUE ~ 0
-                )) %>% 
-  dplyr::filter(!is.na(age))
+                )) 
 
-mesa_longitudinal = mesa_dat_all %>% 
+
+# N = 5,105, OBS = 22,139
+mesa_nodm <- mesa_dat_all %>% 
+  dplyr::filter(!study_id %in% mesa_newdm$study_id) %>% 
+  dplyr::filter(is.na(dmagediag_ever))
+
+
+mesa_longitudinal = mesa_dat_all %>%
+  # only keep newDM + noDM
+  dplyr::filter(study_id %in% mesa_newdm$study_id | study_id %in% mesa_nodm$study_id) %>% 
+  dplyr::select(-dmagediag_ever,-dia_med_age_st) %>% 
   arrange(study_id,exam) %>% 
   # Bringing the updated dmagediag from aric_events
   left_join(mesa_newdm %>% 

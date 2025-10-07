@@ -13,7 +13,7 @@ library(purrr)
 
 # detect variables all NA for some people
 vars_to_check  <- c("age", "height","weight","bmi","wc","sbp", "dbp","hba1c", 
-                     "ldlc","hdlc","glucosef","insulinf","glucose2h",
+                     "ldlc","hdlc","glucosef","insulinf",
                      "tgl", "serumcreatinine","homa2b", "homa2ir")
 
 
@@ -24,13 +24,13 @@ for (var in vars_to_check) {
     summarise(all_na = all(is.na(.data[[var]]))) %>%
     dplyr::filter(all_na) %>%
     nrow()
-  if (n_all_na > 0) problem_vars <- c(problem_vars, var)
 }
+
 print(problem_vars)
 
 
 
-multilevel_vars <- c("age", "height","weight","bmi","sbp", "dbp","hba1c")
+multilevel_vars <- c("age", "height","bmi","sbp", "dbp","hba1c")
 
 # proportion_vars <- c("female")
 # 
@@ -72,22 +72,33 @@ pred[c("homa2b","homa2ir"),c("insulinf","glucosef")] <- 1
 
 
 
-pred[,] <- 1         # Allow all variables as predictors by default
+# Initialize predictor matrix
+pred[,] <- 1  # Start by allowing all variables to predict each other
 
-# Corrected below --------
+# Clear ID variables from being predictors or outcomes
 pred[id_vars,] <- 0
 pred[,id_vars] <- 0
 
-# For multilevel, set cluster variable (joint_id) to -2 for the multilevel vars
-for (v in vars_to_check) {
-  if (v %in% problem_vars) {
-    pred[v, "mice_id"] <- 0
-  } else {
+# Set cluster indicators (-2) for multilevel variables
+for (v in multilevel_vars) {
+  if(v %in% colnames(before_imputation)) {
     pred[v, "mice_id"] <- -2
-  }
+  } 
 }
 
+# Handle special cases
+if(all(c("homa2b", "homa2ir", "insulinf", "glucosef") %in% colnames(before_imputation))) {
+  # HOMA variables should only use insulin and glucose as predictors
+  pred[c("homa2b","homa2ir"),] <- 0
+  pred[c("homa2b","homa2ir"),c("insulinf","glucosef")] <- 1
+} 
 
+
+# Print predictor matrix for debugging
+print("Predictor Matrix:")
+print(pred)
+print("\nMethods:")
+print(method)
 
 mi_dfs <- mice(before_imputation,
                method = method,
@@ -97,6 +108,10 @@ mi_dfs <- mice(before_imputation,
 df <- complete(mi_dfs, action = 1)
 
 saveRDS(mi_dfs, paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/mi_dfs_new.RDS"))
+
+
+
+
 
 # Correlation heatmap for specified variables
 library(corrplot)

@@ -4,20 +4,55 @@ library(purrr)
 library(readr)
 library(writexl)
 
+# new T2D: 7,623
 final_dataset_temp = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/final_dataset_temp.RDS")) %>% 
+  mutate(study = case_when(study == "dpp" ~ "dppos",
+                           TRUE ~ study)) %>% 
   mutate(joint_id = paste(study, original_study_id, sep = "_"))
+
+# 13,734 - New T2D: 4,352, No T2D: 9,382
 aric_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01a_aric.RDS")) %>% 
-  mutate(study = "aric")
+  mutate(study = "aric") %>% 
+  mutate(study_id = as.numeric(str_replace(study_id,"C",""))) %>% 
+  mutate(joint_id = paste(study, study_id, sep = "_"),
+         # newly diagnosed T2D or no T2D
+         newdm_event = case_when(joint_id %in% final_dataset_temp$joint_id ~ 1,
+                                 is.na(dmagediag) ~ 0,
+                                 TRUE ~ NA)) 
+# 4,785 - New T2D: 623, No T2D: 4,162 
 cardia_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01b_cardia.RDS")) %>% 
-  mutate(study = "cardia")
+  mutate(study = "cardia") %>% 
+  mutate(joint_id = paste(study, study_id, sep = "_"),
+         # newly diagnosed T2D or no T2D
+         newdm_event = case_when(joint_id %in% final_dataset_temp$joint_id ~ 1,
+                                 is.na(dmagediag) ~ 0,
+                                 TRUE ~ NA)) 
+# 1,779 - New T2D: 268, No T2D: 1,511
 jhs_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01e_jhs.RDS")) %>% 
   mutate(study = "jhs",
-         race = "NH Black")
+         race = "NH Black") %>% 
+  mutate(joint_id = paste(study, study_id, sep = "_"),
+         # newly diagnosed T2D or no T2D
+         newdm_event = case_when(joint_id %in% final_dataset_temp$joint_id ~ 1,
+                                 is.na(dmagediag) ~ 0,
+                                 TRUE ~ NA)) 
+# 2,772 - New T2D: 1,391, No T2D: 1,381
 dppos_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dppos.RDS")) %>% 
   mutate(study = "dppos",
-         race = race_eth)
+         race = race_eth) %>% 
+  mutate(joint_id = paste(study, study_id, sep = "_"),
+         # newly diagnosed T2D or no T2D
+         newdm_event = case_when(joint_id %in% final_dataset_temp$joint_id ~ 1,
+                                 is.na(dmagediag) ~ 0,
+                                 TRUE ~ NA)) 
+# 6,094 - New T2D: 989, No T2D: 5,105
 mesa_longitudinal <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01f_mesa.RDS")) %>% 
-  mutate(study = "mesa")
+  mutate(study = "mesa") %>% 
+  mutate(joint_id = paste(study, study_id, sep = "_"),
+         # newly diagnosed T2D or no T2D
+         newdm_event = case_when(joint_id %in% final_dataset_temp$joint_id ~ 1,
+                                 is.na(dmagediag) ~ 0,
+                                 TRUE ~ NA)) 
 
 clusters = read_csv(paste0(path_diabetes_subphenotypes_adults_folder,"/working/processed/dec_an02_clean_kmeans_5var_mi_knn_cluster.csv")) %>% 
   dplyr::select(-one_of("...1")) %>% 
@@ -27,12 +62,13 @@ clusters = read_csv(paste0(path_diabetes_subphenotypes_adults_folder,"/working/p
   rename(cluster_study_id = study_id)
 
 
-
-longitudinal_df = bind_rows(aric_longitudinal %>% mutate(study_id = as.numeric(str_replace(study_id,"C",""))),
-                                   cardia_longitudinal,
-                                   jhs_longitudinal,
-                                   dppos_longitudinal %>% mutate(female = sex - 1),
-                                   mesa_longitudinal) %>%
+# 29,164 - New T2D: 7,623, No T2D: 21,541
+longitudinal_df = bind_rows(aric_longitudinal,
+                            cardia_longitudinal,
+                            jhs_longitudinal,
+                            dppos_longitudinal %>% mutate(female = sex - 1),
+                            mesa_longitudinal) %>%
+  select(-newdm, -newdm_event) %>% 
   
   bind_rows(final_dataset_temp %>% dplyr::select(-study_id) %>% 
               rename(study_id = original_study_id) %>% 
@@ -47,9 +83,7 @@ longitudinal_df = bind_rows(aric_longitudinal %>% mutate(study_id = as.numeric(s
                 
               )
               ))) %>% 
-  mutate(joint_id = paste(study, study_id, sep = "_"),
-         # newly diagnosed T2D or no T2D
-         newdm_event = case_when(joint_id %in% final_dataset_temp$joint_id ~ 1,
+  mutate(newdm_event = case_when(joint_id %in% final_dataset_temp$joint_id ~ 1,
                                  is.na(dmagediag) ~ 0,
                                  TRUE ~ NA)) %>% 
   distinct(joint_id,study,study_id,age, .keep_all = TRUE) %>% 
@@ -115,8 +149,7 @@ analytic_df <- longitudinal_df %>%
             by = c("study_id","study","age")) %>% 
   left_join(clusters %>% 
               dplyr::select(cluster_study_id,original_study_id,cluster,study,female),
-            by=c("study"="study","study_id" = "original_study_id","female")) %>% 
-  select(-joint_id,-newdm_event)
+            by=c("study"="study","study_id" = "original_study_id","female")) 
 
 saveRDS(analytic_df,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dsppre01_analytic df.RDS"))
 

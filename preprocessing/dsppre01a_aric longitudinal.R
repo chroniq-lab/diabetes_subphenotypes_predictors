@@ -5,13 +5,23 @@ anthro_vars <- c("sbp","dbp","height","wc","bmi")
 lab_vars <- c("hba1c","insulinf","glucosef","glucose2h","tgl","hdlc","ldlc",
               "serumcreatinine","urinecreatinine","egfr","apo_a","apo_b","uric_acid")
 
+# N = 4,352
 aric_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/aric_newdm.RDS")) 
 aric_baselinedm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/aric_baseline_dm.RDS")) 
 
 
 aric_analysis <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/aric_analysis.RDS")) %>%
+  arrange(study_id,visit) %>% 
+  group_by(study_id) %>% 
+  mutate(dmagediag_V3 = min(dmagediag,na.rm=TRUE))  %>% 
+  ungroup() %>% 
+  mutate(dmagediag_V3 = case_when(dmagediag_V3 == Inf ~ NA_real_,
+                                  TRUE ~ dmagediag_V3)) %>% 
+  
   dplyr::filter(!study_id %in% aric_baselinedm$study_id) %>%
   dplyr::filter(!is.na(age)) %>% 
+  distinct(study_id,visit,bmi,.keep_all =TRUE) %>% 
+  
   arrange(study_id,visit) %>% 
   dplyr::mutate(ratio_th=tgl/hdlc,
                 glucosef2=glucosef*0.0555,
@@ -35,22 +45,31 @@ aric_analysis <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/work
   ) %>% 
   group_by(study_id) %>% 
   mutate(across(one_of("female","race"),~zoo::na.locf(.))) %>% 
-  ungroup()
+  ungroup() 
+
+# N = 9,382, OBS = 37,124
+aric_nodm <- aric_analysis %>% 
+  dplyr::filter(!study_id %in% aric_newdm$study_id) %>% 
+  dplyr::filter(is.na(dmagediag_V3)) 
+
 
 # aric_longitudinal --------------
 
 # Haven't filtered out observations where age >= dmagediag
-
+# N = 13,734
 aric_longitudinal = aric_analysis %>% 
-  dplyr::select(-dmagediag) %>% 
+  # only keep newDM + noDM
+  dplyr::filter(study_id %in% aric_newdm$study_id | study_id %in% aric_nodm$study_id) %>% 
+  dplyr::select(-dmagediag,-dmagediag_V3) %>% 
   # Bringing the updated dmagediag from aric_events
   left_join(aric_newdm %>% 
               dplyr::select(study_id,dmagediag),
             by=c("study_id")) %>% 
   mutate(
-         available_labs = rowSums(!is.na(.[,lab_vars])),
-         available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
-  dplyr::select(study_id,age,dmagediag,female,available_labs,available_anthro,one_of(anthro_vars),one_of(lab_vars),race_rev,race)
+    available_labs = rowSums(!is.na(.[,lab_vars])),
+    available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
+  dplyr::select(study_id,age,dmagediag,female,available_labs,available_anthro,
+                one_of(anthro_vars),one_of(lab_vars),race_rev,race)
 
 
 saveRDS(aric_longitudinal,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01a_aric.RDS"))

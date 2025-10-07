@@ -8,13 +8,23 @@ lab_vars <- c("hba1c","insulinf","glucosef","glucose2h","tgl","hdlc","ldlc",
 med_vars <- c("med_bp_use","med_chol_use","med_dep_use")
 lifsy_vars <- c("smoking")
 
+# N = 623
 cardia_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/cardia_newdm.RDS")) 
 cardia_baselinedm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/cardia_baseline_dm.RDS")) 
 
 
 cardia_dat_all <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/cardia_dat_all.RDS")) %>%
+  arrange(study_id,year)%>% 
+  group_by(study_id)%>% 
+  mutate(dmagediag_ever = min(dmagediag,na.rm=TRUE)) %>% 
+  ungroup() %>% 
+  mutate(dmagediag_ever = case_when(dmagediag_ever == Inf ~ NA_real_,
+                                    TRUE ~ dmagediag_ever)) %>% 
+
   dplyr::filter(!study_id %in% cardia_baselinedm$study_id) %>% 
-  #dplyr::filter(year!=0)%>% 
+  distinct(study_id,year,bmi,.keep_all =TRUE) %>% 
+  dplyr::filter(!is.na(age)) %>% 
+
   dplyr::mutate(ratio_th=tgl/hdlc,
                 glucosef2=glucosef*0.0555,
                 insulinf2=insulinf*6,
@@ -53,12 +63,20 @@ cardia_dat_all <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/wor
                   cigr_st == 2 | (is.na(cigr_st) & smk_st == 1) ~ "Current",
                   TRUE ~ "Never"
                 )
-  ) %>% 
-  dplyr::filter(!is.na(age))
+  ) 
+
+
+# N = 4,162
+cardia_nodm <- cardia_dat_all %>% 
+  dplyr::filter(!study_id %in% cardia_newdm$study_id) %>% 
+  dplyr::filter(is.na(dmagediag_ever))
+
 
 cardia_longitudinal = cardia_dat_all %>% 
+  # only keep newDM + noDM
+  dplyr::filter(study_id %in% cardia_newdm$study_id | study_id %in% cardia_nodm$study_id) %>% 
+  dplyr::select(-dmagediag,-dmagediag_ever) %>% 
   arrange(study_id,year) %>% 
-  dplyr::select(-dmagediag) %>% 
   # Bringing the updated dmagediag from aric_events
   left_join(cardia_newdm %>% 
               dplyr::select(study_id,dmagediag),

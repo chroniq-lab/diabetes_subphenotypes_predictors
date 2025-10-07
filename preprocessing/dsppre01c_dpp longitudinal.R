@@ -10,17 +10,33 @@ lifsy_vars <- c("smoking")
 
 # Each 'release' contributed a row
 dpp_demographics <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dpppre01_demographic.RDS")) %>% 
-  distinct(study_id,.keep_all=TRUE)
+  distinct(study_id,.keep_all=TRUE) %>% 
+  mutate(dpp_intervention = case_when(
+    treatment %in% c("Troglitazone", "Metformin", "Lifestyle") ~ 1,
+    TRUE ~ 0 # 1,030
+  ))
+
+# 2,635
+dpp_intervention_ids <- dpp_demographics %>%
+  dplyr::filter(dpp_intervention == 1) %>%
+  select(study_id)
+# 1,030
+dpp_placebo_ids <- dpp_demographics %>%
+  dplyr::filter(dpp_intervention == 0) %>%
+  select(study_id)
 
 # Each 'release' contributed a row
 dos_demographics <- readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/interim/dospre01_demographic.RDS")) %>% 
-  distinct(study_id,.keep_all=TRUE)
+  distinct(study_id,.keep_all=TRUE) 
 
 # Diabetes outcomes ------------
 # Among intensive lifestyle, metformin, and placebo # participants, 849 had been diagnosed as having diabetes as of September, 2002, 
 # and another 503 participants developed diabetes during the first phase of DPPOS
-dpp_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/dpp_newdm.RDS")) 
+# N = 291
+dpp_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/dpp_newdm.RDS")) %>% 
+  dplyr::filter(treatment == "Placebo") # remove all intervention arms [decision made on 8.14.24]
 
+# N = 1,100
 dos_newdm = readRDS(paste0(path_diabetes_subphenotypes_adults_folder,"/working/cleaned/dos_newdm.RDS")) %>% 
   anti_join(dpp_newdm,
             by=c("study_id")) 
@@ -75,11 +91,7 @@ dppos_max_diagDays = bind_rows(
   dpp_nodm %>% mutate(dpp = 1, newdm = 0),
   dos_nodm %>% mutate(dpp = 0, newdm = 0),
 ) %>% 
-  mutate(dpp_intervention = case_when(
-    dpp == 1 & treatment %in% c("Troglitazone", "Metformin", "Lifestyle") ~ 1,
-    TRUE ~ 0
-  )) %>% 
-  dplyr::select(study_id,dpp,newdm,diagDays,dpp_intervention)
+  dplyr::select(study_id,dpp,newdm,diagDays)
 
 # saveRDS(dppos_max_diagDays,paste0(path_diabetes_subphenotypes_predictors_folder,"/working/cleaned/dsppre01c_dpp_max_diagDays.RDS"))
 
@@ -149,9 +161,8 @@ lab = bind_rows(dpp_lab_visit,
   dplyr::filter(newdm == 0 | (newdm == 1 & lab_StudyDays < diagDays) | (newdm == 1 & lab_StudyDays > (diagDays + 365)))
 
 anthro = bind_rows(dpp_anthro,
-                dos_anthro) %>% 
-  left_join(dppos_max_diagDays %>% 
-              select(-dpp_intervention),
+                   dos_anthro) %>% 
+  left_join(dppos_max_diagDays,
             by=c("study_id")) %>% 
   
   # Removed the below to get later visits also
@@ -188,7 +199,22 @@ lifestyle <- bind_rows(dpp_lifestyle,dos_lifestyle) %>%
   select(study_id,lifsy_StudyDays = StudyDays,visit,smoking)
 
 
+# N = 440, OBS = 1,345
+dppos_undm <- lab %>% 
+  dplyr::filter(newdm == 0) %>% 
+  dplyr::filter(hba1c>=6.5|glucosef>=126)
+
+# DPP: 291, DPPOS: 1,100
+dppos_newdm <- lab %>% 
+  dplyr::filter(newdm == 1) %>% 
+  mutate(study = case_when(dpp == 1 ~ "dpp",
+                           TRUE ~ "dppos")) %>% 
+  mutate(joint_id = paste(study, study_id, sep = "_"))
+
+
 dppos_longitudinal = lab %>%
+  # remove undiagnosed cases
+  dplyr::filter(!study_id %in% dppos_undm$study_id) %>% 
   left_join(anthro %>% 
               dplyr::select(-dpp,-newdm,-diagDays) %>% 
               mutate(anthro_StudyDays_plus90 = anthro_StudyDays + 90),
@@ -221,14 +247,19 @@ dppos_longitudinal = lab %>%
                          agegroup == 5 ~ 57 + lab_StudyDays/365,
                          agegroup == 6 ~ 62 + lab_StudyDays/365,
                          agegroup == 7 ~ 67 + lab_StudyDays/365)) %>% 
-  dplyr::filter(!is.na(bmi)) %>% 
+  # dplyr::filter(!is.na(bmi)) %>% 
   mutate(age = round(age,2),
          available_labs = rowSums(!is.na(.[,lab_vars])),
          available_anthro = rowSums(!is.na(.[,anthro_vars]))) %>% 
   dplyr::select(study_id,dpp,newdm,age,dmagediag,diagDays,lab_StudyDays,anthro_StudyDays,available_labs,available_anthro,
                 one_of(anthro_vars),one_of(lab_vars),one_of(med_vars),one_of(lifsy_vars),
-                sex,race_eth,dpp_intervention,visit) %>% 
-  arrange(study_id,lab_StudyDays,age)
+                sex,race_eth,treatment,visit) %>% 
+  arrange(study_id,lab_StudyDays,age) %>% 
+  # identify DPP intervention arms
+  mutate(dpp_intervention = case_when(
+    study_id %in% dpp_intervention_ids$study_id ~ 1,
+    TRUE ~ NA_real_
+  ))
 
 
 

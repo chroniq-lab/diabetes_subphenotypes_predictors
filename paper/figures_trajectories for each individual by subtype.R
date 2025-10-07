@@ -28,11 +28,6 @@ biomarkers_long <- analytic_df %>%
     subtype = factor(subtype, levels = c("NOT2D", "MOD", "SIRD", "SIDD", "MARD"))
   )
 
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(purrr)
-library(patchwork)
 
 # Define custom y-axis limits per biomarker
 y_limits <- list(

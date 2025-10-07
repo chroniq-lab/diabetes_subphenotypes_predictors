@@ -17,7 +17,7 @@ analytic_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/wo
 newt2d_df <- analytic_df %>% 
   dplyr::filter(newdm_event == 1) 
   
-# ID with prior A1c, N = 2,517
+# ID with prior A1c, N = 2,216
 prior_a1c_newt2d <- newt2d_df %>% 
   dplyr::filter(age < dmagediag) %>%
   dplyr::filter(!is.na(hba1c)) %>% 
@@ -27,14 +27,14 @@ prior_a1c_newt2d <- newt2d_df %>%
   ungroup() %>% 
   mutate(earliest_age_newt2d = age)
 
-# ID without prior A1c, N = 5,106
+# ID without prior A1c, N = 5,407
 noprior_a1c_newt2d <- newt2d_df %>% 
   dplyr::filter(!joint_id %in% prior_a1c_newt2d$joint_id) %>% 
   distinct(joint_id)
 
 # Prior A1c ---------------------------
 
-## T2D diagnosis ## N = 2,517
+## T2D diagnosis ## N = 2,216
 t2d_diag_a1c <- newt2d_df %>% 
   dplyr::filter(joint_id %in% prior_a1c_newt2d$joint_id) %>% 
   # To address decimal values
@@ -45,22 +45,22 @@ t2d_diag_a1c <- newt2d_df %>%
   ungroup() %>% 
   mutate(max_age_newt2d = age) 
 
-# 1. A1c + BMI, N = 1,862
+# 1. A1c + BMI, N = 1,570
 a1c_bmi_newt2d <- t2d_diag_a1c %>% 
   dplyr::filter(!is.na(hba1c) & !is.na(bmi)) %>% 
   distinct(joint_id, max_age_newt2d)
 
-# 2. A1c + no BMI, N = 24
+# 2. A1c + no BMI, N = 22
 a1c_nobmi <- t2d_diag_a1c %>% 
   dplyr::filter(!is.na(hba1c) & is.na(bmi)) %>% 
   distinct(joint_id)
 
-# 3. no A1c + BMI, N = 583
+# 3. no A1c + BMI, N = 579
 noa1c_bmi <- t2d_diag_a1c %>% 
   dplyr::filter(is.na(hba1c) & !is.na(bmi)) %>% 
   distinct(joint_id)
 
-# 4. no A1c + no BMI, N = 48
+# 4. no A1c + no BMI, N = 45
 noa1c_nobmi <- t2d_diag_a1c %>% 
   dplyr::filter(is.na(hba1c) & is.na(bmi)) %>% 
   distinct(joint_id)
@@ -68,7 +68,7 @@ noa1c_nobmi <- t2d_diag_a1c %>%
 
 # No Prior A1c ---------------------------
 
-## T2D diagnosis ## N = 5,106
+## T2D diagnosis ## N = 5,407
 t2d_diag <- newt2d_df %>% 
   dplyr::filter(joint_id %in% noprior_a1c_newt2d$joint_id) %>% 
   # To address decimal values
@@ -78,22 +78,22 @@ t2d_diag <- newt2d_df %>%
   slice_min(order_by = diff, n = 1, with_ties = FALSE) %>%
   ungroup()
 
-# 1. A1c + BMI, N = 1,527
+# 1. A1c + BMI, N = 1,819
 a1c_bmi <- t2d_diag %>% 
   dplyr::filter(!is.na(hba1c) & !is.na(bmi)) %>% 
   distinct(joint_id)
 
-# 2. A1c + no BMI, N = 122
+# 2. A1c + no BMI, N = 124
 a1c_nobmi <- t2d_diag %>% 
   dplyr::filter(!is.na(hba1c) & is.na(bmi)) %>% 
   distinct(joint_id)
 
-# 3. no A1c + BMI, N = 3,400
+# 3. no A1c + BMI, N = 3,404
 noa1c_bmi <- t2d_diag %>% 
   dplyr::filter(is.na(hba1c) & !is.na(bmi)) %>% 
   distinct(joint_id)
 
-# 4. no A1c + no BMI, N = 57
+# 4. no A1c + no BMI, N = 60
 noa1c_nobmi <- t2d_diag %>% 
   dplyr::filter(is.na(hba1c) & is.na(bmi)) %>% 
   distinct(joint_id)
@@ -102,11 +102,11 @@ noa1c_nobmi <- t2d_diag %>%
 
 
 
-# No T2D, N = 21,541 -----------------------------------
+# No T2D, N = 22,373 -----------------------------------
 not2d_df <- analytic_df %>% 
   dplyr::filter(newdm_event == 0) 
 
-# last follow-up with A1c, N = 13,868
+# last follow-up with A1c, N = 14,598
 last_a1c <- not2d_df %>% 
   dplyr::filter(!is.na(hba1c)) %>% 
   arrange(joint_id, age) %>%                      
@@ -116,7 +116,7 @@ last_a1c <- not2d_df %>%
   mutate(max_age_not2d = age) %>% 
   distinct(joint_id,max_age_not2d)
 
-# ID last follow-up with A1c, at least 1 prior visit N = 13,868
+# ID last follow-up with A1c, at least 1 prior visit N = 14,598
 last_a1c_select <- not2d_df %>% 
   dplyr::filter(joint_id %in% last_a1c$joint_id) %>% 
   left_join(last_a1c, by = "joint_id") %>% 
@@ -124,7 +124,7 @@ last_a1c_select <- not2d_df %>%
   dplyr::filter(has_age_before_max) %>% 
   select(-has_age_before_max)
 
-# ID with prior A1c, N = 8,169
+# ID with prior A1c, N = 8,775
 prior_a1c_not2d <- last_a1c_select %>% 
   dplyr::filter(age < max_age_not2d) %>%
   dplyr::filter(!is.na(hba1c)) %>% 
@@ -134,24 +134,24 @@ prior_a1c_not2d <- last_a1c_select %>%
   ungroup() %>% 
   mutate(earliest_age_not2d = age)
 
-# ID without prior A1c, N = 5,699
+# ID without prior A1c, N = 5,823
 noprior_a1c <- last_a1c_select %>% 
   dplyr::filter(!joint_id %in% prior_a1c_not2d$joint_id) %>% 
   distinct(joint_id)
 
 # Prior A1c ---------------------------
 
-## last follow-up ## N = 8,169
+## last follow-up ## N = 8,775
 last_fup <- last_a1c_select %>% 
   dplyr::filter(joint_id %in% prior_a1c_not2d$joint_id) %>% 
   dplyr::filter(age == max_age_not2d)
 
-# 1. A1c + BMI, N = 8,092
+# 1. A1c + BMI, N = 8,747
 a1c_bmi_not2d <- last_fup %>% 
   dplyr::filter(!is.na(hba1c) & !is.na(bmi)) %>% 
   distinct(joint_id,max_age_not2d)
 
-# 2. A1c + no BMI, N = 77
+# 2. A1c + no BMI, N = 28
 a1c_nobmi <- last_fup %>% 
   dplyr::filter(!is.na(hba1c) & is.na(bmi)) %>% 
   distinct(joint_id)
@@ -169,17 +169,17 @@ noa1c_nobmi <- last_fup %>%
 
 # No Prior A1c ---------------------------
 
-## T2D diagnosis ## N = 5,699
+## T2D diagnosis ## N = 5,823
 last_fup <- last_a1c_select %>% 
   dplyr::filter(joint_id %in% noprior_a1c$joint_id) %>% 
   dplyr::filter(age == max_age_not2d)
 
-# 1. A1c + BMI, N = 5,618
+# 1. A1c + BMI, N = 5,786
 a1c_bmi <- last_fup %>% 
   dplyr::filter(!is.na(hba1c) & !is.na(bmi)) %>% 
   distinct(joint_id)
 
-# 2. A1c + no BMI, N = 81
+# 2. A1c + no BMI, N = 37
 a1c_nobmi <- last_fup %>% 
   dplyr::filter(!is.na(hba1c) & is.na(bmi)) %>% 
   distinct(joint_id)
@@ -200,7 +200,7 @@ noa1c_nobmi <- last_fup %>%
 
 ##### final analytic sample ######
 
-# T2D: 1,862, OBS = 21,028; NoT2D: 8,092, OBS = 50,390
+# T2D: 1,570, OBS = 16,556; NoT2D: 8,747, OBS = 57,089
 selected_df <- analytic_df %>% 
   # earliest and last OBS with available A1c and BMI
   dplyr::filter(joint_id %in% c(a1c_bmi_newt2d$joint_id, a1c_bmi_not2d$joint_id)) %>% 
