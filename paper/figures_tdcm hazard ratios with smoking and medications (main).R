@@ -10,12 +10,8 @@ cluster_all_colors = c(cluster_colors_cosmos,"#CD5C5C")
 names(cluster_all_colors) = c(names(cluster_colors_cosmos),"New T2D")
 
 
-tdcm_coef <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspse01b_pooled tdcm results with ipw.csv")) %>% 
+tdcm_coef <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan03_pooled tdcm results with smoking and medications.csv")) %>% 
   select(iv, estimate, lci, uci, model) %>% 
-  # dplyr::filter(model != "Overall") %>% 
-  # mutate(HR = paste0(format(round(estimate, 2), nsmall = 2), " (",
-  #                       format(round(lci, 2), nsmall = 2), ", ",
-  #                       format(round(uci, 2), nsmall = 2), ")")) %>% 
   mutate(
     HR = paste0(
       formatC(round(estimate, 2), format = "f", digits = 2), " (",
@@ -78,6 +74,6 @@ plot_forest <- ggplot(tdcm_coef, aes(y = term, x = estimate, xmin = lci, xmax = 
   ) 
 
 
-ggsave(plot_forest,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/tdcm hazard ratio for pathophysiological markers with ipw.png"),width=10,height=13)
+ggsave(plot_forest,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/tdcm hazard ratio for pathophysiological markers with smoking and medications.png"),width=10,height=13)
 
 

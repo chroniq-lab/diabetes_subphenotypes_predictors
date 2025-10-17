@@ -3,7 +3,7 @@ evaluate_coxph_quantile <- function(model, data, time_horizon, quantiles = c(0.1
   lp <- predict(model, newdata = data, type = "lp")
   
   # Get baseline survival
-  base_surv <- survival::basehaz(model, centered = FALSE)
+  base_surv <- basehaz(model, centered = TRUE)
   S0 <- approx(base_surv$time, exp(-base_surv$hazard), xout = time_horizon, rule = 2)$y
   
   # Predicted survival and risk
@@ -22,6 +22,7 @@ evaluate_coxph_quantile <- function(model, data, time_horizon, quantiles = c(0.1
   if (!any(valid)) {
     results <- data.frame(
       threshold   = quantiles,
+      threshold_value = NA_real_,
       sensitivity = NA_real_,
       specificity = NA_real_,
       F1          = NA_real_,
@@ -48,7 +49,15 @@ evaluate_coxph_quantile <- function(model, data, time_horizon, quantiles = c(0.1
     specificity <- if ((TN + FP) > 0) TN / (TN + FP) else NA_real_
     f1 <- if ((2 * TP + FP + FN) > 0) 2 * TP / (2 * TP + FP + FN) else NA_real_
     
-    return(c(threshold = quantiles[idx], sensitivity = sensitivity, specificity = specificity, F1 = f1))
+    # Create a data frame directly instead of using c() which might cause naming issues
+    data.frame(
+      threshold = quantiles[idx],
+      threshold_value = thresh,
+      sensitivity = sensitivity,
+      specificity = specificity,
+      F1 = f1,
+      stringsAsFactors = FALSE
+    )
   }) %>% bind_rows()
   
   # C-index
@@ -64,7 +73,9 @@ evaluate_coxph_quantile <- function(model, data, time_horizon, quantiles = c(0.1
     }
   }, error = function(e) NA_real_)
   
+  # Add the additional metrics
   results$c_index <- cidx
   results$cal_slope <- cal_slope
+  
   return(results)
 }

@@ -13,8 +13,11 @@ source("functions/egfr_ckdepi_2021.R")
 mi_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dsphyc301_mi_dfs.RDS"))
 
 clean_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan01_analytic sample.RDS")) %>% 
-  dplyr::filter(dpp_intervention == 1) %>% 
-  distinct(study,study_id,dpp_intervention) # n = 1,722
+  select(joint_id,age,dpp_intervention,smoking,med_chol_use,med_bp_use,med_dep_use) %>% 
+  mutate(dpp_intervention = case_when(
+    dpp_intervention == 1 ~ 1,
+    TRUE ~ 0
+  ))
 
 analytic_dfs <- list()
 overall_coxph <- list()
@@ -41,11 +44,15 @@ for(i in 1:mi_dfs$m) {
     mutate(egfr_ckdepi_2021 = egfr_ckdepi_2021(scr = serumcreatinine,female = female,age = age),
            time_to_event = censored_age - age) %>% 
     left_join(clean_df,
-              by = c("study","study_id")) %>% 
-    mutate(dpp_intervention = case_when(
-      dpp_intervention == 1 ~ 1,
-      TRUE ~ 0
-    ))
+              by = c("joint_id","age")) %>% 
+    mutate(smoking = case_when(is.na(smoking) ~ "Never",
+                               TRUE ~ smoking),
+           med_bp_use = case_when(is.na(med_bp_use) ~ 0,
+                                  TRUE ~ med_bp_use),
+           med_chol_use = case_when(is.na(med_chol_use) ~ 0,
+                                    TRUE ~ med_chol_use),
+           med_dep_use = case_when(is.na(med_dep_use) ~ 0,
+                                   TRUE ~ med_dep_use))
     
   
   analytic_df <- df %>% 
@@ -86,7 +93,15 @@ for (i in 1:length(analytic_dfs)) {
            race_hispanic = case_when(race == "Hispanic" ~ 1,
                                      TRUE ~ 0),
            race_other = case_when(race %in% c("NH Other", "Other") ~ 1,
-                                  TRUE ~ 0)
+                                  TRUE ~ 0),
+           study_cardia = case_when (study == "cardia" ~ 1,
+                                     TRUE ~ 0),
+           study_dppos = case_when(study == "dppos" ~ 1,
+                                   TRUE ~ 0),
+           study_jhs = case_when(study == "jhs" ~ 1,
+                                 TRUE ~ 0),
+           study_mesa= case_when(study == "mesa" ~ 1,
+                                 TRUE ~ 0)
            )
   
   coxph_df <- cluster_df %>%
@@ -114,38 +129,45 @@ for (i in 1:length(analytic_dfs)) {
   
   # Multinomial models
   multinom_all[[i]] <- nnet::multinom(subtype ~ log(time_to_event) + study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                                      + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention,
+                                      + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                                      + smoking + med_chol_use + med_bp_use + med_dep_use,
                                       data = coxph_df)
   
   coxph_ref <- coxph_df %>% 
     mutate(subtype <- relevel(subtype, ref = "MARD"))
   # reference: MARD
   multinom_ref[[i]] <- nnet::multinom(subtype ~ log(time_to_event) + study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                                      + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention,
+                                      + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                                      + smoking + med_chol_use + med_bp_use + med_dep_use,
                                       data = coxph_ref)
   
   # Cox PH models
   
   overall_coxph[[i]] <- coxph(Surv(time_to_event, newdm_event) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                              + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                              + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                              + smoking + med_chol_use + med_bp_use + med_dep_use, 
                               data = coxph_df)
   
   mard_coxph[[i]] <- coxph(Surv(time_to_event, mard) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                           + smoking + med_chol_use + med_bp_use + med_dep_use, 
                            data = coxph_df)
   
   mod_coxph[[i]] <- coxph(Surv(time_to_event, mod) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                          + smoking + med_chol_use + med_bp_use + med_dep_use, 
                           data = coxph_df)
   
   sidd_coxph[[i]] <- coxph(Surv(time_to_event, sidd) ~ study + female + race3 + earliest_age + bmi + hba1c + homa2b_scaled 
-                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dpp_intervention), 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dpp_intervention)
+                           + smoking + med_chol_use + med_bp_use + med_dep_use, 
                            data = coxph_df)
   
   # CARDIA has 0 people from SIRD
   # sird_coxph uses study-specific dummies
   sird_coxph[[i]] <- coxph(Surv(time_to_event, sird) ~ strata(study) + female + race3 + earliest_age + bmi + hba1c + homa2b_scaled 
-                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dppos_interv, theta = 50), 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dppos_interv, theta = 50)
+                           + smoking + med_chol_use + med_bp_use + med_dep_use, 
                            data = coxph_df, ties = "efron", control = coxph.control(iter.max = 200, eps = 1e-09))
   
   # SDH competing risk models (crr)
@@ -167,7 +189,7 @@ for (i in 1:length(analytic_dfs)) {
   sird_sdh[[i]] <- crr(coxph_df$time_to_event, coxph_df$cluster_numeric, cengroup = 0, failcode = 4,
                        cov1 = coxph_df[, c("study_dppos", "study_jhs", "female", "race_black", "race_hispanic", "race_other", "earliest_age",
                                            "bmi", "hba1c", "homa2b_scaled", "homa2ir", "ldlc_scaled",
-                                           "sbp_scaled", "egfr_ckdepi_2021_scaled")])
+                                           "sbp_scaled", "egfr_ckdepi_2021_scaled","dpp_intervention")])
   
   # PH assumption tests
   # ph_tests_overall[[i]] <- cox.zph(overall_coxph[[i]])
@@ -277,8 +299,6 @@ unpooled_resuts_sdh <- bind_rows(
     broom::tidy(m) %>% mutate(model = "SIRD",iteration = index) %>% 
       return(.)
   })
-  
-  
   
   
 )

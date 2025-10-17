@@ -12,8 +12,11 @@ source("functions/egfr_ckdepi_2021.R")
 mi_dfs <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dsphyc301_mi_dfs.RDS"))
 
 clean_df <- readRDS(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan01_analytic sample.RDS")) %>% 
-  dplyr::filter(dpp_intervention == 1) %>% 
-  distinct(study,study_id,dpp_intervention) # n = 1,722
+  select(joint_id,age,dpp_intervention,smoking,med_chol_use,med_bp_use,med_dep_use) %>% 
+  mutate(dpp_intervention = case_when(
+    dpp_intervention == 1 ~ 1,
+    TRUE ~ 0
+  ))
 
 
 coxph_dfs <- list()
@@ -35,11 +38,15 @@ for(i in 1:mi_dfs$m) {
     mutate(egfr_ckdepi_2021 = egfr_ckdepi_2021(scr = serumcreatinine,female = female,age = age),
            time_to_event = censored_age - age) %>% 
     left_join(clean_df,
-              by = c("study","study_id")) %>% 
-    mutate(dpp_intervention = case_when(
-      dpp_intervention == 1 ~ 1,
-      TRUE ~ 0
-    ))
+              by = c("joint_id","age")) %>% 
+    mutate(smoking = case_when(is.na(smoking) ~ "Never",
+                               TRUE ~ smoking),
+           med_bp_use = case_when(is.na(med_bp_use) ~ 0,
+                                  TRUE ~ med_bp_use),
+           med_chol_use = case_when(is.na(med_chol_use) ~ 0,
+                                    TRUE ~ med_chol_use),
+           med_dep_use = case_when(is.na(med_dep_use) ~ 0,
+                                   TRUE ~ med_dep_use))
   
   
   analytic_df <- df %>% 
@@ -102,24 +109,29 @@ for(i in 1:mi_dfs$m) {
   # Cox PH models
   
   overall_coxph[[i]] <- coxph(Surv(time_to_event, newdm_event) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                              + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                              + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                              + smoking + med_chol_use + med_bp_use + med_dep_use, 
                               data = train_df)
   
   mard_coxph[[i]] <- coxph(Surv(time_to_event, mard) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                           + smoking + med_chol_use + med_bp_use + med_dep_use, 
                            data = train_df)
   
   mod_coxph[[i]] <- coxph(Surv(time_to_event, mod) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                          + smoking + med_chol_use + med_bp_use + med_dep_use, 
                           data = train_df)
   
   sidd_coxph[[i]] <- coxph(Surv(time_to_event, sidd) ~ study + female + race3 + earliest_age + bmi + hba1c + homa2b_scaled 
-                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dpp_intervention, theta = 100),
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dpp_intervention, theta = 100)
+                           + smoking + med_chol_use + med_bp_use + med_dep_use,
                            data = train_df, ties = "efron", control = coxph.control(iter.max = 100))
   
   # CARDIA has 0 people from SIRD
   sird_coxph[[i]] <- coxph(Surv(time_to_event, sird) ~ strata(study) + female + race3 + earliest_age + bmi + hba1c + homa2b_scaled 
-                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dppos_interv, theta = 50), 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dppos_interv, theta = 50)
+                           + smoking + med_chol_use + med_bp_use + med_dep_use, 
                            data = train_df, ties = "efron", control = coxph.control(iter.max = 200, eps = 1e-09))
   
 }
@@ -139,7 +151,7 @@ validation_results <- map2_dfr(1:mi_dfs$m, test_sets, function(i, test_df) {
   rename_with(~ c("imputation", "Overall", "MARD", "MOD", "SIDD", "SIRD")) %>%         # Rename columns
   mutate(across(Overall:SIRD, ~ round(.x, 3))) 
 
-# Save as CSV
+
 write.csv(validation_results, "analysis/dspan07_coxph validation cindex.csv", row.names = FALSE)
 
 
@@ -153,11 +165,15 @@ for(i in 1:mi_dfs$m) {
     mutate(egfr_ckdepi_2021 = egfr_ckdepi_2021(scr = serumcreatinine,female = female,age = age),
            time_to_event = censored_age - age) %>% 
     left_join(clean_df,
-              by = c("study","study_id")) %>% 
-    mutate(dpp_intervention = case_when(
-      dpp_intervention == 1 ~ 1,
-      TRUE ~ 0
-    ))
+              by = c("joint_id","age")) %>% 
+    mutate(smoking = case_when(is.na(smoking) ~ "Never",
+                               TRUE ~ smoking),
+           med_bp_use = case_when(is.na(med_bp_use) ~ 0,
+                                  TRUE ~ med_bp_use),
+           med_chol_use = case_when(is.na(med_chol_use) ~ 0,
+                                    TRUE ~ med_chol_use),
+           med_dep_use = case_when(is.na(med_dep_use) ~ 0,
+                                   TRUE ~ med_dep_use))
   
   
   analytic_df <- df %>% 
@@ -223,24 +239,29 @@ for(i in 1:mi_dfs$m) {
   # Cox PH models
   
   overall_coxph[[i]] <- coxph(Surv(time_to_event, newdm_event) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                              + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                              + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                              + smoking + med_chol_use + med_bp_use + med_dep_use, 
                               data = train_df)
   
   mard_coxph[[i]] <- coxph(Surv(time_to_event, mard) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                           + smoking + med_chol_use + med_bp_use + med_dep_use, 
                            data = train_df)
   
   mod_coxph[[i]] <- coxph(Surv(time_to_event, mod) ~ study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
-                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention, 
+                          + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention
+                          + smoking + med_chol_use + med_bp_use + med_dep_use, 
                           data = train_df)
   
   sidd_coxph[[i]] <- coxph(Surv(time_to_event, sidd) ~ study + female + race3 + earliest_age + bmi + hba1c + homa2b_scaled 
-                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dpp_intervention, theta = 100),
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dpp_intervention, theta = 100)
+                           + smoking + med_chol_use + med_bp_use + med_dep_use,
                            data = train_df, ties = "efron", control = coxph.control(iter.max = 100))
   
   # CARDIA has 0 people from SIRD
   sird_coxph[[i]] <- coxph(Surv(time_to_event, sird) ~ strata(study) + female + race3 + earliest_age + bmi + hba1c + homa2b_scaled 
-                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dppos_interv, theta = 50), 
+                           + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + ridge(dppos_interv, theta = 50)
+                           + smoking + med_chol_use + med_bp_use + med_dep_use, 
                            data = train_df, ties = "efron", control = coxph.control(iter.max = 200, eps = 1e-09))
   
 }
@@ -260,7 +281,7 @@ validation_results <- map2_dfr(1:mi_dfs$m, test_sets, function(i, test_df) {
   rename_with(~ c("imputation", "Overall", "MARD", "MOD", "SIDD", "SIRD")) %>%         # Rename columns
   mutate(across(Overall:SIRD, ~ round(.x, 3))) 
 
-# Save as CSV
+
 write.csv(validation_results, "analysis/dspan07_coxph validation cindex radom visit.csv", row.names = FALSE)
 
 

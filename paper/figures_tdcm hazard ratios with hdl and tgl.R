@@ -10,7 +10,7 @@ cluster_all_colors = c(cluster_colors_cosmos,"#CD5C5C")
 names(cluster_all_colors) = c(names(cluster_colors_cosmos),"New T2D")
 
 
-tdcm_coef <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspan08_pooled tdcm results with hdl and tgl.csv")) %>% 
+tdcm_coef <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspse04_pooled tdcm results with hdl and tgl.csv")) %>% 
   select(iv, estimate, lci, uci, model) %>% 
   # dplyr::filter(model != "Overall") %>% 
   # mutate(HR = paste0(format(round(estimate, 2), nsmall = 2), " (",

@@ -10,8 +10,12 @@ cluster_all_colors = c(cluster_colors_cosmos,"#CD5C5C")
 names(cluster_all_colors) = c(names(cluster_colors_cosmos),"New T2D")
 
 
-tdcm_coef <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspse04_pooled tdcm results with smoking and medications.csv")) %>% 
+tdcm_coef <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"/working/processed/dspse02b_pooled tdcm results.csv")) %>% 
   select(iv, estimate, lci, uci, model) %>% 
+  # dplyr::filter(model != "Overall") %>% 
+  # mutate(HR = paste0(format(round(estimate, 2), nsmall = 2), " (",
+  #                       format(round(lci, 2), nsmall = 2), ", ",
+  #                       format(round(uci, 2), nsmall = 2), ")")) %>% 
   mutate(
     HR = paste0(
       formatC(round(estimate, 2), format = "f", digits = 2), " (",
@@ -47,7 +51,7 @@ plot_forest <- ggplot(tdcm_coef, aes(y = term, x = estimate, xmin = lci, xmax = 
   geom_vline(xintercept = 1, linetype = "dashed", color = "darkgrey") +
   geom_hline(yintercept = 0, linetype = "solid", color = "black") +
   scale_color_manual(values = cluster_all_colors) +
-  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1)) +
+  scale_x_continuous(limits = c(0, 6), breaks = seq(0, 6, by = 1)) +
   labs(
     x = "Hazard ratio (95% CI)",
     y = NULL,
@@ -74,6 +78,6 @@ plot_forest <- ggplot(tdcm_coef, aes(y = term, x = estimate, xmin = lci, xmax = 
   ) 
 
 
-ggsave(plot_forest,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/tdcm hazard ratio for pathophysiological markers with smoking and medications.png"),width=10,height=13)
+ggsave(plot_forest,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/tdcm hazard ratio for pathophysiological markers from pooled cohorts.png"),width=10,height=13)
 
 
