@@ -134,7 +134,7 @@ for (i in 1:length(analytic_dfs)) {
                                       data = coxph_df)
   
   coxph_ref <- coxph_df %>% 
-    mutate(subtype <- relevel(subtype, ref = "MARD"))
+    mutate(subtype = relevel(subtype, ref = "MARD"))
   # reference: MARD
   multinom_ref[[i]] <- nnet::multinom(subtype ~ log(time_to_event) + study + female + race + earliest_age + bmi + hba1c + homa2b_scaled 
                                       + homa2ir + ldlc_scaled + sbp_scaled + egfr_ckdepi_2021_scaled + dpp_intervention

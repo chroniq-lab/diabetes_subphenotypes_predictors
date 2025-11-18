@@ -42,7 +42,8 @@ multinom_coef <- read_csv(paste0(path_diabetes_subphenotypes_predictors_folder,"
   ) %>% 
   mutate(model = case_when(model == "Overall" ~ "New T2D",
                            TRUE ~ model)) %>% 
-  mutate(model = factor(model,levels = names(cluster_all_colors)))
+  mutate(model = factor(model,levels = names(cluster_all_colors))) %>% 
+  dplyr::filter(!is.na(model)) 
 
 
 # forest plot
@@ -88,7 +89,7 @@ plot_forest_ref <- ggplot(multinom_ref, aes(y = term, x = estimate, xmin = lci, 
   geom_vline(xintercept = 1, linetype = "dashed", color = "darkgrey") +
   geom_hline(yintercept = 0, linetype = "solid", color = "black") +
   scale_color_manual(values = cluster_all_colors) +
-  scale_x_continuous(limits = c(0, 18), breaks = seq(0, 18, by = 2)) +
+  scale_x_continuous(limits = c(0, 3), breaks = seq(0, 3, by = 0.5)) +
   labs(
     x = "Odds ratio (95% CI)",
     y = NULL,
@@ -97,7 +98,7 @@ plot_forest_ref <- ggplot(multinom_ref, aes(y = term, x = estimate, xmin = lci, 
   ) +
   theme_bw(base_size = 18) +
   theme(
-    legend.position = "bottom",
+    legend.position = "none",
     legend.text = element_text(size = 18),
     axis.text.y = element_text(size = 18),
     axis.title.x = element_text(size = 18),
@@ -117,17 +118,20 @@ plot_forest_ref <- ggplot(multinom_ref, aes(y = term, x = estimate, xmin = lci, 
 
 library(patchwork)
 
-plot_forest <- plot_forest + ggtitle("A. Reference group = 'NOT2D'")
+plot_forest <- plot_forest + 
+  ggtitle("A. Reference group = 'NOT2D'") +
+  theme(plot.title = element_text(hjust = 0.5))
+
 plot_forest_ref <- plot_forest_ref + 
   ggtitle("B. Reference group = 'MARD'") +
   theme(
+    plot.title = element_text(hjust = 0.5),
     axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
+    axis.ticks.y = element_blank(),
+    legend.position = "none"
   )
 
-combined_plot <- plot_forest + plot_forest_ref +
-  plot_layout(ncol = 2, guides = "collect") &
-  theme(legend.position = "bottom")
+combined_plot <- plot_forest + plot_forest_ref 
 
 ggsave(combined_plot,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/multinomial odds ratio for pathophysiological markers.png"),width=17,height=13)
 
