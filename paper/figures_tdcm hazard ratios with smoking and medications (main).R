@@ -73,7 +73,7 @@ plot_forest <- ggplot(tdcm_coef, aes(y = term, x = estimate, xmin = lci, xmax = 
     size = 6
   ) 
 
-
-ggsave(plot_forest,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/tdcm hazard ratio for pathophysiological markers with smoking and medications.png"),width=10,height=13)
+ggsave(plot_forest,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/tdcm hazard ratio for pathophysiological markers with smoking and medications.pdf"),width=10,height=13,dpi=600)
+ggsave(plot_forest,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/tdcm hazard ratio for pathophysiological markers with smoking and medications.pdf"),width=10,height=13,dpi=600)
 
 

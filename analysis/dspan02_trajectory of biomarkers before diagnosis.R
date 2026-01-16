@@ -133,6 +133,15 @@ ggarrange(fig_bmi,
   ggsave(.,filename=paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/trajectory of biomarkers before diagnosis.jpg"),width = 6,height = 6)
 
 
+ggarrange(fig_bmi,
+          fig_hba1c,
+          fig_homa2b,
+          fig_homa2ir,
+          nrow=2,ncol=2,labels=LETTERS[1:4],common.legend = TRUE,legend = "bottom") %>% 
+  ggsave(.,filename = paste0(path_diabetes_subphenotypes_predictors_folder,"/figures/trajectory of biomarkers before diagnosis.pdf"),
+     width = 6, height = 6, dpi = 600, device = "pdf")
+
+
 
 
 
